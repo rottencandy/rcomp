@@ -1,5 +1,5 @@
 [package]
-name = "rust-comp"
+name = "rcomp"
 version = "0.1.0"
 authors = ["Mohammed Saud <md.saud020@gmail.com>"]
 edition = "2018"

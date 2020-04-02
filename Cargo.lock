@@ -22,7 +22,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "rust-comp"
+name = "rcomp"
 version = "0.1.0"
 dependencies = [
  "xcb",
