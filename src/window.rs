@@ -1,12 +1,13 @@
 pub struct Window {
-    id: xcb::Window,
-    x: i16,
-    y: i16,
-    width: u16,
-    height: u16,
+    pub id: xcb::Window,
+    pub x: i16,
+    pub y: i16,
+    pub width: u16,
+    pub height: u16,
 }
 
 impl Window {
+    /// Returns a vector of mapped `Windows` recieved from `XQueryTree`
     pub fn fetch_windows(conn: &xcb::Connection) -> Vec<Window> {
         let setup = conn.get_setup();
 
@@ -32,6 +33,13 @@ impl Window {
         windows
     }
 
+    /// Checks wether a window is mapped
+    pub fn is_mapped(conn: &xcb::Connection, win: xcb::Window) -> bool {
+        let attrs = xcb::get_window_attributes(conn, win).get_reply().unwrap();
+        attrs.map_state() == xcb::MAP_STATE_VIEWABLE as u8
+    }
+
+    /// Creates a new `Window`
     pub fn new(conn: &xcb::Connection, win: xcb::Window) -> Window {
         let geometry = xcb::get_geometry(conn, win).get_reply().unwrap();
         Window {
@@ -41,5 +49,14 @@ impl Window {
             width: geometry.width(),
             height: geometry.height(),
         }
+    }
+
+    /// Update the properties of an existing `Window`
+    pub fn update(&mut self, conn: &xcb::Connection) {
+        let geometry = xcb::get_geometry(conn, self.id).get_reply().unwrap();
+        self.x = geometry.x();
+        self.y = geometry.y();
+        self.width = geometry.width();
+        self.height = geometry.height();
     }
 }
