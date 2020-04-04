@@ -1,8 +1,9 @@
 extern crate xcb;
 
+mod backend;
+mod event;
 mod init;
 mod window;
-mod event;
 
 use std::error::Error;
 use std::process;
@@ -10,10 +11,11 @@ use window::Window;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let (conn, screen_num) =
-        xcb::Connection::connect(None).unwrap_or_else(|err| {
+        xcb::Connection::connect_with_xlib_display().unwrap_or_else(|err| {
             eprintln!("Error opening connection to X server: {}", err);
             process::exit(1);
         });
+    conn.set_event_queue_owner(xcb::EventQueueOwner::Xcb);
 
     init::extensions::verify(&conn).unwrap_or_else(|err| {
         eprintln!("Error: extension `{}` not found.", err);

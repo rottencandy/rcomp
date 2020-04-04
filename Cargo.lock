@@ -22,10 +22,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "pkg-config"
+version = "0.3.17"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "05da548ad6865900e60eaba7f589cc0783590a92e940c26953ff81ddbab2d677"
+
+[[package]]
 name = "rcomp"
 version = "0.1.0"
 dependencies = [
+ "x11",
  "xcb",
+]
+
+[[package]]
+name = "x11"
+version = "2.18.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "77ecd092546cb16f25783a5451538e73afc8d32e242648d54f4ae5459ba1e773"
+dependencies = [
+ "libc",
+ "pkg-config",
 ]
 
 [[package]]
@@ -36,4 +53,5 @@ checksum = "62056f63138b39116f82a540c983cc11f1c90cd70b3d492a70c25eaa50bd22a6"
 dependencies = [
  "libc",
  "log",
+ "x11",
 ]
