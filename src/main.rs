@@ -2,6 +2,7 @@ extern crate xcb;
 
 mod init;
 mod window;
+mod event;
 
 use std::error::Error;
 use std::process;
@@ -29,52 +30,14 @@ fn main() -> Result<(), Box<dyn Error>> {
         eprintln!("Failed redirecting subwindows: {}", err);
         process::exit(1);
     });
-    let windows = Window::fetch_windows(&conn);
+    // TODO use linked list
+    let mut windows = Window::fetch_windows(&conn);
     init::window::request_events(&conn);
 
     loop {
-        let event = conn.wait_for_event();
-        match event {
+        match conn.wait_for_event() {
             None => break,
-            Some(event) => match event.response_type() & !0x80 {
-                xcb::CREATE_NOTIFY => {
-                    let ev: &xcb::CreateNotifyEvent =
-                        unsafe { xcb::cast_event(&event) };
-                }
-                xcb::DESTROY_NOTIFY => {
-                    let ev: &xcb::DestroyNotifyEvent =
-                        unsafe { xcb::cast_event(&event) };
-                }
-                xcb::CONFIGURE_NOTIFY => {
-                    let ev: &xcb::ConfigureNotifyEvent =
-                        unsafe { xcb::cast_event(&event) };
-                }
-                xcb::MAP_NOTIFY => {
-                    let ev: &xcb::MapNotifyEvent =
-                        unsafe { xcb::cast_event(&event) };
-                }
-                xcb::UNMAP_NOTIFY => {
-                    let ev: &xcb::UnmapNotifyEvent =
-                        unsafe { xcb::cast_event(&event) };
-                }
-                xcb::REPARENT_NOTIFY => {
-                    let ev: &xcb::ReparentNotifyEvent =
-                        unsafe { xcb::cast_event(&event) };
-                }
-                xcb::CIRCULATE_NOTIFY => {
-                    let ev: &xcb::CirculateNotifyEvent =
-                        unsafe { xcb::cast_event(&event) };
-                }
-                xcb::EXPOSE => {
-                    let ev: &xcb::ExposeEvent =
-                        unsafe { xcb::cast_event(&event) };
-                }
-                xcb::PROPERTY_NOTIFY => {
-                    let ev: &xcb::PropertyNotifyEvent =
-                        unsafe { xcb::cast_event(&event) };
-                }
-                _ => {}
-            },
+            Some(e) => event::handle_event(&conn, &e, &mut windows),
         }
     }
 
