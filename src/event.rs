@@ -11,7 +11,7 @@ pub fn handle_event(
             let ev: &xcb::CreateNotifyEvent =
                 unsafe { xcb::cast_event(&event) };
             let win = ev.window();
-            if Window::is_mapped(conn, win) {
+            if let Some(true) = Window::is_mapped(conn, win) {
                 windows.push(Window::new(conn, win));
             }
         }
@@ -21,7 +21,7 @@ pub fn handle_event(
             let ev: &xcb::DestroyNotifyEvent =
                 unsafe { xcb::cast_event(&event) };
             let win = ev.window();
-            if Window::is_mapped(conn, win) {
+            if let Some(true) = Window::is_mapped(conn, win) {
                 windows.retain(|w| w.id == win);
             }
         }
@@ -30,10 +30,11 @@ pub fn handle_event(
             let ev: &xcb::ConfigureNotifyEvent =
                 unsafe { xcb::cast_event(&event) };
             let win = ev.window();
-            if Window::is_mapped(conn, win) {
-                let index = windows.iter().position(|w| w.id == win).unwrap();
-                // TODO: utilize event methods instead of `xcb::get_geometry`
-                windows[index].update(conn);
+            if let Some(true) = Window::is_mapped(conn, win) {
+                if let Some(index) = windows.iter().position(|w| w.id == win) {
+                    // TODO: utilize event methods instead of `xcb::get_geometry`
+                    windows[index].update(conn);
+                }
             }
         }
         // Existing window mapped
@@ -57,7 +58,7 @@ pub fn handle_event(
             let ev: &xcb::ReparentNotifyEvent =
                 unsafe { xcb::cast_event(&event) };
             let win = ev.window();
-            if Window::is_mapped(conn, win) {
+            if let Some(true) = Window::is_mapped(conn, win) {
                 let index = windows.iter().position(|w| w.id == win).unwrap();
             }
         }
@@ -66,7 +67,7 @@ pub fn handle_event(
             let ev: &xcb::CirculateNotifyEvent =
                 unsafe { xcb::cast_event(&event) };
             let win = ev.window();
-            if Window::is_mapped(conn, win) {
+            if let Some(true) = Window::is_mapped(conn, win) {
                 let index = windows.iter().position(|w| w.id == win).unwrap();
             }
         }
@@ -78,7 +79,9 @@ pub fn handle_event(
             // count specifies the number of remaining Expose events which
             // follow for this window
             // To optimize redraws, we only update on the last Expose event
-            if Window::is_mapped(conn, win) && ev.count() == 0 {}
+            if let Some(true) = Window::is_mapped(conn, win) {
+                if ev.count() == 0 {}
+            }
         }
         // Window property changed
         // TODO

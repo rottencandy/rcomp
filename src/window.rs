@@ -34,9 +34,14 @@ impl Window {
     }
 
     /// Checks wether a window is mapped
-    pub fn is_mapped(conn: &xcb::Connection, win: xcb::Window) -> bool {
-        let attrs = xcb::get_window_attributes(conn, win).get_reply().unwrap();
-        attrs.map_state() == xcb::MAP_STATE_VIEWABLE as u8
+    pub fn is_mapped(
+        conn: &xcb::Connection,
+        win: xcb::Window,
+    ) -> Option<bool> {
+        if let Ok(attr) = xcb::get_window_attributes(conn, win).get_reply() {
+            return Some(attr.map_state() == xcb::MAP_STATE_VIEWABLE as u8);
+        }
+        None
     }
 
     /// Creates a new `Window`
