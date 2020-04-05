@@ -34,7 +34,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut windows = Window::fetch_windows(&conn);
     init::window::request_events(&conn);
 
-    opengl::init(&conn, screen_num, overlay);
+    let backend = opengl::Opengl::init(&conn, screen_num, overlay);
+    backend.draw();
 
     loop {
         match conn.wait_for_event() {
@@ -42,6 +43,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             Some(e) => event::handle_event(&conn, &e, &mut windows),
         }
     }
+
+    backend.destroy();
 
     Ok(())
 }

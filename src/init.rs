@@ -85,6 +85,8 @@ pub mod extensions {
     // Use hashmap with loop?
     // TODO: Check extension versions, aside from existence
     pub fn verify(conn: &xcb::Connection) -> Result<(), &str> {
+        conn.prefetch_extension_data(composite::id());
+        conn.prefetch_extension_data(randr::id());
         if !conn.get_extension_data(composite::id()).unwrap().present() {
             return Err("composite");
         }

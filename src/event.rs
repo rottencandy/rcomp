@@ -20,10 +20,7 @@ pub fn handle_event(
         xcb::DESTROY_NOTIFY => {
             let ev: &xcb::DestroyNotifyEvent =
                 unsafe { xcb::cast_event(&event) };
-            let win = ev.window();
-            if let Some(true) = Window::is_mapped(conn, win) {
-                windows.retain(|w| w.id == win);
-            }
+            windows.retain(|w| w.id == ev.window());
         }
         // Window property(size, border, position, stack order) changed
         xcb::CONFIGURE_NOTIFY => {
@@ -33,6 +30,8 @@ pub fn handle_event(
             if let Some(true) = Window::is_mapped(conn, win) {
                 if let Some(index) = windows.iter().position(|w| w.id == win) {
                     // TODO: utilize event methods instead of `xcb::get_geometry`
+                    // TODO: Check if root window is updated
+                    // TODO: restack
                     windows[index].update(conn);
                 }
             }
