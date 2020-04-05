@@ -18,8 +18,8 @@ pub mod window {
             screen.root(),
             0,
             0,
-            1,
-            1,
+            640,
+            480,
             0,
             // INPUT_ONLY does not seem to be able to grab atom ownership
             xcb::WINDOW_CLASS_INPUT_OUTPUT as u16,
@@ -81,7 +81,6 @@ pub mod window {
 
 pub mod extensions {
     use xcb::{composite, randr};
-
     /// Checks that the required extensions are present in the server.
     // Use hashmap with loop?
     // TODO: Check extension versions, aside from existence
@@ -97,22 +96,27 @@ pub mod extensions {
 
     /// Uses the composite extension to request redirection of all windows
     /// to offscreen pixmaps.
+    /// Returns the composite overlay window id
     pub fn redirect_subwindows(
         conn: &xcb::Connection,
-    ) -> Result<(), xcb::GenericError> {
+    ) -> Result<xcb::Window, xcb::GenericError> {
         let setup = conn.get_setup();
 
         // Prevent unexpected changes to window tree while we redirect
         xcb::grab_server(&conn);
-        for screen in setup.roots() {
-            composite::redirect_subwindows(
-                conn,
-                screen.root(),
-                composite::REDIRECT_MANUAL as u8,
-            )
-            .request_check()?;
-        }
+        let screen = setup.roots().last().unwrap();
+        composite::redirect_subwindows(
+            conn,
+            screen.root(),
+            composite::REDIRECT_MANUAL as u8,
+        )
+        .request_check()?;
         xcb::ungrab_server(&conn);
-        Ok(())
+
+        // get the overlay window id
+        let overlay =
+            composite::get_overlay_window(conn, screen.root()).get_reply()?;
+
+        Ok(overlay.overlay_win())
     }
 }

@@ -1,8 +1,8 @@
 extern crate xcb;
 
-mod backend;
 mod event;
 mod init;
+mod opengl;
 mod window;
 
 use std::error::Error;
@@ -10,8 +10,8 @@ use std::process;
 use window::Window;
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let (conn, screen_num) =
-        xcb::Connection::connect_with_xlib_display().unwrap_or_else(|err| {
+    let (conn, screen_num) = xcb::Connection::connect_with_xlib_display()
+        .unwrap_or_else(|err| {
             eprintln!("Error opening connection to X server: {}", err);
             process::exit(1);
         });
@@ -22,19 +22,19 @@ fn main() -> Result<(), Box<dyn Error>> {
         process::exit(1);
     });
 
-    let win = init::window::create_window(&conn, screen_num);
+    let overlay =
+        init::extensions::redirect_subwindows(&conn).unwrap_or_else(|err| {
+            eprintln!("Failed redirecting subwindows: {}", err);
+            process::exit(1);
+        });
 
-    //let scr_info =
-    //    xcb::randr::get_screen_info(&conn, win).get_reply().unwrap();
-    //println!("Screen rate: {}", scr_info.rate());
+    let _win = init::window::create_window(&conn, screen_num);
 
-    init::extensions::redirect_subwindows(&conn).unwrap_or_else(|err| {
-        eprintln!("Failed redirecting subwindows: {}", err);
-        process::exit(1);
-    });
     // TODO use linked list
     let mut windows = Window::fetch_windows(&conn);
     init::window::request_events(&conn);
+
+    opengl::init(&conn, screen_num, overlay);
 
     loop {
         match conn.wait_for_event() {
