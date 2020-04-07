@@ -1,9 +1,11 @@
+use crate::opengl::Opengl;
 use crate::window::Window;
 
 pub fn handle_event(
     conn: &xcb::Connection,
     event: &xcb::GenericEvent,
     windows: &mut Vec<Window>,
+    backend: &Opengl,
 ) {
     match event.response_type() & !0x80 {
         // New window created
@@ -11,9 +13,7 @@ pub fn handle_event(
             let ev: &xcb::CreateNotifyEvent =
                 unsafe { xcb::cast_event(&event) };
             let win = ev.window();
-            if let Some(true) = Window::is_mapped(conn, win) {
-                windows.push(Window::new(conn, win));
-            }
+            windows.push(Window::new(conn, win));
         }
         // Window destroyed
         // For any window, an event for every child is sent out first
@@ -27,29 +27,29 @@ pub fn handle_event(
             let ev: &xcb::ConfigureNotifyEvent =
                 unsafe { xcb::cast_event(&event) };
             let win = ev.window();
-            if let Some(true) = Window::is_mapped(conn, win) {
-                if let Some(index) = windows.iter().position(|w| w.id == win) {
-                    // TODO: utilize event methods instead of `xcb::get_geometry`
-                    // TODO: Check if root window is updated
-                    // TODO: restack
-                    windows[index].update(conn);
-                }
+            if let Some(index) = windows.iter().position(|w| w.id == win) {
+                // TODO: utilize event methods instead of `xcb::get_geometry`
+                // TODO: Check if root window is updated
+                // TODO: restack
+                windows[index].update(conn);
             }
         }
         // Existing window mapped
         xcb::MAP_NOTIFY => {
             let ev: &xcb::MapNotifyEvent = unsafe { xcb::cast_event(&event) };
             let win = ev.window();
-            // probably no need to check if window is mapped
-            windows.push(Window::new(conn, win));
+            if let Some(index) = windows.iter().position(|w| w.id == win) {
+                windows[index].mapped = true;
+            }
         }
         // Existing window unmapped
         xcb::UNMAP_NOTIFY => {
             let ev: &xcb::UnmapNotifyEvent =
                 unsafe { xcb::cast_event(&event) };
             let win = ev.window();
-            // probably no need to check if window is mapped
-            windows.retain(|w| w.id == win);
+            if let Some(index) = windows.iter().position(|w| w.id == win) {
+                windows[index].mapped = false;
+            }
         }
         // Window's parent changed
         // TODO

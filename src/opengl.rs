@@ -25,9 +25,8 @@ impl<'a> Opengl<'a> {
         conn: &xcb::Connection,
         screens: i32,
         win: xcb::Window,
-    ) -> Opengl {
-        // TODO check with return Result
-        verify_extensions(conn, screens);
+    ) -> Result<Opengl, &str> {
+        verify_extensions(conn, screens)?;
         // setup framebuffer context
         let fbc = get_glxfbconfig(
             conn.get_raw_dpy(),
@@ -57,7 +56,7 @@ impl<'a> Opengl<'a> {
                 1,
                 0,
             ],
-        );
+        )?;
 
         conn.flush();
         // with glx, no need of a current context is needed to load symbols
@@ -67,11 +66,11 @@ impl<'a> Opengl<'a> {
             std::mem::transmute(load_gl_func("glXCreateContextAttribsARB"))
         };
 
-        // load all other symbols
+        // load all function pointers
         unsafe { gl::load_with(|n| load_gl_func(&n)) };
 
         if !gl::GenVertexArrays::is_loaded() {
-            panic!("no GL3 support available!");
+            return Err("no GL3 support available!");
         }
         // installing an event handler to check if error is generated
         unsafe { ctx_error_occurred = false };
@@ -82,7 +81,7 @@ impl<'a> Opengl<'a> {
             GLX_CONTEXT_MAJOR_VERSION_ARB as c_int,
             3,
             GLX_CONTEXT_MINOR_VERSION_ARB as c_int,
-            0,
+            3,
             0,
         ];
         let ctx = unsafe {
@@ -95,27 +94,27 @@ impl<'a> Opengl<'a> {
             );
             conn.flush();
             if ctx.is_null() || ctx_error_occurred {
-                panic!("error when creating gl-3.0 context");
+                return Err("error when creating gl-3.0 context");
             }
             if glXIsDirect(conn.get_raw_dpy(), ctx) == 0 {
-                panic!("obtained indirect rendering context")
+                return Err("obtained indirect rendering context");
             }
             ctx
         };
 
         unsafe { xlib::XSetErrorHandler(std::mem::transmute(old_handler)) };
-        Opengl {
+        Ok(Opengl {
             ctx: ctx,
             conn: conn,
             dpy: conn.get_raw_dpy(),
             draw_win: win as xlib::XID,
-        }
+        })
     }
 
     pub fn draw(&self) {
         unsafe {
             glXMakeCurrent(self.dpy, self.draw_win, self.ctx);
-            gl::ClearColor(0.5f32, 0.5f32, 1.0f32, 1.0f32);
+            gl::ClearColor(0.3f32, 0.3f32, 0.4f32, 1.0f32);
             gl::Clear(gl::COLOR_BUFFER_BIT);
             gl::Flush();
             check_gl_error();
@@ -124,8 +123,10 @@ impl<'a> Opengl<'a> {
         }
         self.conn.flush();
     }
+}
 
-    pub fn destroy(self) {
+impl<'a> Drop for Opengl<'a> {
+    fn drop(&mut self) {
         // only to make sure that rs_client generate correct names for DRI2
         // (used to be "*_DRI_2_*")
         // should be in a "compile tests" section instead of example
@@ -135,9 +136,12 @@ impl<'a> Opengl<'a> {
     }
 }
 
-fn verify_extensions(conn: &xcb::Connection, screens: i32) {
-    if glx_dec_version(conn.get_raw_dpy()) < 13 {
-        panic!("glx-1.3 is not supported");
+fn verify_extensions(
+    conn: &xcb::Connection,
+    screens: i32,
+) -> Result<(), &str> {
+    if glx_dec_version(conn.get_raw_dpy())? < 13 {
+        return Err("glx-1.3 is not supported");
     }
 
     // verify extensions
@@ -148,8 +152,39 @@ fn verify_extensions(conn: &xcb::Connection, screens: i32) {
     };
 
     if !check_glx_extension(&glx_exts, "GLX_ARB_create_context") {
-        panic!("could not find GLX extension GLX_ARB_create_context");
+        return Err("could not find GLX extension GLX_ARB_create_context");
     }
+    if !check_glx_extension(&glx_exts, "GLX_EXT_texture_from_pixmap") {
+        return Err(
+            "could not find GLX extension GLX_EXT_texture_from_pixmap",
+        );
+    }
+    Ok(())
+}
+
+// returns the glx version in a decimal form
+// eg. 1.3  => 13
+fn glx_dec_version(dpy: *mut xlib::Display) -> Result<i32, &'static str> {
+    let mut maj: c_int = 0;
+    let mut min: c_int = 0;
+    unsafe {
+        if glXQueryVersion(dpy, &mut maj as *mut c_int, &mut min as *mut c_int)
+            == 0
+        {
+            return Err("cannot get glx version");
+        }
+    }
+    Ok((maj * 10 + min) as i32)
+}
+
+/// Checks if a given glx extension exists in extension query string
+fn check_glx_extension(glx_exts: &str, ext_name: &str) -> bool {
+    for glx_ext in glx_exts.split(" ") {
+        if glx_ext == ext_name {
+            return true;
+        }
+    }
+    false
 }
 
 // type of glxCreateContextAttribs extension
@@ -165,7 +200,7 @@ fn get_glxfbconfig(
     dpy: *mut xlib::Display,
     screens: i32,
     visual_attribs: &[i32],
-) -> GLXFBConfig {
+) -> Result<GLXFBConfig, &str> {
     unsafe {
         let mut fbcount: c_int = 0;
         let fbcs = glXChooseFBConfig(
@@ -176,38 +211,13 @@ fn get_glxfbconfig(
         );
 
         if fbcount == 0 {
-            panic!("could not find compatible fb config");
+            return Err("could not find compatible fb config");
         }
         // we pick the first from the list
         let fbc = *fbcs;
         xlib::XFree(fbcs as *mut c_void);
-        fbc
+        Ok(fbc)
     }
-}
-
-// returns the glx version in a decimal form
-// eg. 1.3  => 13
-fn glx_dec_version(dpy: *mut xlib::Display) -> i32 {
-    let mut maj: c_int = 0;
-    let mut min: c_int = 0;
-    unsafe {
-        if glXQueryVersion(dpy, &mut maj as *mut c_int, &mut min as *mut c_int)
-            == 0
-        {
-            panic!("cannot get glx version");
-        }
-    }
-    (maj * 10 + min) as i32
-}
-
-/// Checks if a given glx extension exists in extension query string
-fn check_glx_extension(glx_exts: &str, ext_name: &str) -> bool {
-    for glx_ext in glx_exts.split(" ") {
-        if glx_ext == ext_name {
-            return true;
-        }
-    }
-    false
 }
 
 unsafe fn load_gl_func(name: &str) -> *mut c_void {
@@ -233,4 +243,70 @@ unsafe fn check_gl_error() {
     if err != gl::NO_ERROR {
         println!("got gl error {}", err);
     }
+}
+
+struct Shader {
+    pub id: gl::types::GLuint,
+}
+
+impl Shader {
+    pub fn from_source(
+        source: &CStr,
+        kind: gl::types::GLuint,
+    ) -> Result<Shader, String> {
+        let id = shader_from_source(source, kind)?;
+        Ok(Shader { id })
+    }
+    pub fn from_vert_source(source: &CStr) -> Result<Shader, String> {
+        Shader::from_source(source, gl::VERTEX_SHADER)
+    }
+    pub fn from_frag_source(source: &CStr) -> Result<Shader, String> {
+        Shader::from_source(source, gl::FRAGMENT_SHADER)
+    }
+}
+
+impl Drop for Shader {
+    fn drop(&mut self) {
+        unsafe {
+            gl::DeleteShader(self.id);
+        }
+    }
+}
+
+fn shader_from_source(
+    source: &CStr,
+    kind: gl::types::GLuint,
+) -> Result<gl::types::GLuint, String> {
+    let id = unsafe { gl::CreateShader(kind) };
+    unsafe {
+        gl::ShaderSource(id, 1, &source.as_ptr(), std::ptr::null());
+        gl::CompileShader(id);
+    }
+    let mut success: gl::types::GLint = 1;
+    unsafe {
+        gl::GetShaderiv(id, gl::COMPILE_STATUS, &mut success);
+    }
+    if success == 0 {
+        let mut buflen: gl::types::GLint = 0;
+        unsafe {
+            gl::GetShaderiv(id, gl::INFO_LOG_LENGTH, &mut buflen);
+        }
+        let error = create_whitespace_cstring_with_len(buflen as usize);
+        unsafe {
+            gl::GetShaderInfoLog(
+                id,
+                buflen,
+                std::ptr::null_mut(),
+                error.as_ptr() as *mut gl::types::GLchar,
+            );
+        }
+        return Err(error.to_string_lossy().into_owned());
+    }
+    Ok(id)
+}
+
+fn create_whitespace_cstring_with_len(len: usize) -> CString {
+    let mut buffer: Vec<u8> = Vec::with_capacity(len as usize + 1);
+    buffer.extend([b' '].iter().cycle().take(len as usize));
+    unsafe { CString::from_vec_unchecked(buffer) }
 }

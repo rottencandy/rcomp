@@ -34,17 +34,21 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut windows = Window::fetch_windows(&conn);
     init::window::request_events(&conn);
 
-    let backend = opengl::Opengl::init(&conn, screen_num, overlay);
+    let backend = opengl::Opengl::init(&conn, screen_num, overlay)
+        .unwrap_or_else(|err| {
+            eprintln!("Unable to initialize backend: {}", err);
+            process::exit(1);
+        });
     backend.draw();
 
     loop {
         match conn.wait_for_event() {
             None => break,
-            Some(e) => event::handle_event(&conn, &e, &mut windows),
+            Some(event) => {
+                event::handle_event(&conn, &event, &mut windows, &backend)
+            }
         }
     }
-
-    backend.destroy();
 
     Ok(())
 }
