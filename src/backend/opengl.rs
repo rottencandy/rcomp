@@ -1,16 +1,20 @@
 extern crate gl;
 extern crate x11;
 
-use x11::{glx::*, xlib};
+mod shader;
 
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_int, c_void};
 use std::ptr::null_mut;
 
+use shader::{Program, Shader};
+use x11::{glx::*, xlib};
+
 // Minimum reuqired version for glxCreateContextAttribs extension
 const GLX_CONTEXT_MAJOR_VERSION_ARB: u32 = 0x2091;
 const GLX_CONTEXT_MINOR_VERSION_ARB: u32 = 0x2092;
 
+#[allow(non_upper_case_globals)]
 static mut ctx_error_occurred: bool = false;
 
 pub struct Opengl<'a> {
@@ -102,7 +106,95 @@ impl<'a> Opengl<'a> {
             ctx
         };
 
-        unsafe { xlib::XSetErrorHandler(std::mem::transmute(old_handler)) };
+        unsafe {
+            xlib::XSetErrorHandler(std::mem::transmute(old_handler));
+            glXMakeCurrent(conn.get_raw_dpy(), win as xlib::XID, ctx);
+        }
+        conn.flush();
+        ////////////
+        ////////////
+        let vert_shader = Shader::from_vert_source(
+            &CString::new(include_str!("opengl/triangle.vert")).unwrap(),
+        )
+        .unwrap();
+
+        let frag_shader = Shader::from_frag_source(
+            &CString::new(include_str!("opengl/triangle.frag")).unwrap(),
+        )
+        .unwrap();
+
+        let shader_program =
+            Program::from_shaders(&[vert_shader, frag_shader]).unwrap();
+
+        let vertices: Vec<f32> = vec![
+            // positions     // colors
+            -0.5, -0.5, 0.0, 1.0, 0.0, 0.0, // bottom right
+            0.5, -0.5, 0.0, 0.0, 1.0, 0.0, // bottom left
+            0.0, 0.5, 0.0, 0.0, 0.0, 1.0, // top
+        ];
+
+        let mut vbo: gl::types::GLuint = 0;
+        unsafe {
+            gl::GenBuffers(1, &mut vbo);
+        }
+        unsafe {
+            gl::BindBuffer(gl::ARRAY_BUFFER, vbo);
+            gl::BufferData(
+                gl::ARRAY_BUFFER,
+                (vertices.len() * std::mem::size_of::<f32>())
+                    as gl::types::GLsizeiptr,
+                vertices.as_ptr() as *const gl::types::GLvoid,
+                gl::STATIC_DRAW,
+            );
+            gl::BindBuffer(gl::ARRAY_BUFFER, 0);
+        }
+
+        let mut vao: gl::types::GLuint = 0;
+        unsafe {
+            gl::GenVertexArrays(1, &mut vao);
+        }
+        unsafe {
+            gl::BindVertexArray(vao);
+            gl::BindBuffer(gl::ARRAY_BUFFER, vbo);
+
+            gl::EnableVertexAttribArray(0);
+            gl::VertexAttribPointer(
+                0,
+                3,
+                gl::FLOAT,
+                gl::FALSE,
+                (6 * std::mem::size_of::<f32>()) as gl::types::GLint,
+                std::ptr::null(),
+            );
+
+            gl::EnableVertexAttribArray(1);
+            gl::VertexAttribPointer(
+                1,
+                3,
+                gl::FLOAT,
+                gl::FALSE,
+                (6 * std::mem::size_of::<f32>()) as gl::types::GLint,
+                (3 * std::mem::size_of::<f32>()) as *const gl::types::GLvoid,
+            );
+            gl::BindBuffer(gl::ARRAY_BUFFER, 0);
+            gl::BindVertexArray(0);
+        }
+
+        //////////// draw
+        unsafe {
+            gl::ClearColor(0.3, 0.3, 0.4, 1.0);
+            gl::Clear(gl::COLOR_BUFFER_BIT);
+            shader_program.set_used();
+
+            gl::BindVertexArray(vao);
+            gl::DrawArrays(gl::TRIANGLES, 0, 3);
+
+            check_gl_error();
+            glXSwapBuffers(conn.get_raw_dpy(), win as xlib::XID);
+        }
+
+        ////////////
+        ////////////
         Ok(Opengl {
             ctx: ctx,
             conn: conn,
@@ -241,72 +333,6 @@ unsafe extern "C" fn ctx_error_handler(
 unsafe fn check_gl_error() {
     let err = gl::GetError();
     if err != gl::NO_ERROR {
-        println!("got gl error {}", err);
+        eprintln!("Got gl error: {}", err);
     }
-}
-
-struct Shader {
-    pub id: gl::types::GLuint,
-}
-
-impl Shader {
-    pub fn from_source(
-        source: &CStr,
-        kind: gl::types::GLuint,
-    ) -> Result<Shader, String> {
-        let id = shader_from_source(source, kind)?;
-        Ok(Shader { id })
-    }
-    pub fn from_vert_source(source: &CStr) -> Result<Shader, String> {
-        Shader::from_source(source, gl::VERTEX_SHADER)
-    }
-    pub fn from_frag_source(source: &CStr) -> Result<Shader, String> {
-        Shader::from_source(source, gl::FRAGMENT_SHADER)
-    }
-}
-
-impl Drop for Shader {
-    fn drop(&mut self) {
-        unsafe {
-            gl::DeleteShader(self.id);
-        }
-    }
-}
-
-fn shader_from_source(
-    source: &CStr,
-    kind: gl::types::GLuint,
-) -> Result<gl::types::GLuint, String> {
-    let id = unsafe { gl::CreateShader(kind) };
-    unsafe {
-        gl::ShaderSource(id, 1, &source.as_ptr(), std::ptr::null());
-        gl::CompileShader(id);
-    }
-    let mut success: gl::types::GLint = 1;
-    unsafe {
-        gl::GetShaderiv(id, gl::COMPILE_STATUS, &mut success);
-    }
-    if success == 0 {
-        let mut buflen: gl::types::GLint = 0;
-        unsafe {
-            gl::GetShaderiv(id, gl::INFO_LOG_LENGTH, &mut buflen);
-        }
-        let error = create_whitespace_cstring_with_len(buflen as usize);
-        unsafe {
-            gl::GetShaderInfoLog(
-                id,
-                buflen,
-                std::ptr::null_mut(),
-                error.as_ptr() as *mut gl::types::GLchar,
-            );
-        }
-        return Err(error.to_string_lossy().into_owned());
-    }
-    Ok(id)
-}
-
-fn create_whitespace_cstring_with_len(len: usize) -> CString {
-    let mut buffer: Vec<u8> = Vec::with_capacity(len as usize + 1);
-    buffer.extend([b' '].iter().cycle().take(len as usize));
-    unsafe { CString::from_vec_unchecked(buffer) }
 }

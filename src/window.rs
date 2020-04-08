@@ -15,7 +15,7 @@ impl Window {
         let tree = xcb::query_tree(conn, screen.root()).get_reply().unwrap();
         let mut windows: Vec<Window> =
             Vec::with_capacity(tree.children_len() as usize);
-        for win in tree.children().iter() {
+        for win in tree.children() {
             windows.push(Window::new(conn, *win));
             //let pix = conn.generate_id();
             //composite::name_window_pixmap(conn, *win, pix)

@@ -1,10 +1,11 @@
 extern crate xcb;
 
+mod backend;
 mod event;
 mod init;
-mod opengl;
 mod window;
 
+use backend::opengl;
 use std::error::Error;
 use std::process;
 use window::Window;
@@ -39,7 +40,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             eprintln!("Unable to initialize backend: {}", err);
             process::exit(1);
         });
-    backend.draw();
+    //backend.draw();
 
     loop {
         match conn.wait_for_event() {
