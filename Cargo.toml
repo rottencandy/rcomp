@@ -9,4 +9,4 @@ edition = "2018"
 [dependencies]
 xcb = { version = "0.9", features = ["composite", "randr", "xlib_xcb", "dri2"] }
 x11 = { version = "2.18.2", features = ["xlib", "glx"] }
-gl = "0.5.2"
+gl = "0.14.0"
