@@ -5,7 +5,7 @@ pub fn handle_event(
     conn: &xcb::Connection,
     event: &xcb::GenericEvent,
     windows: &mut Vec<Window>,
-    backend: &Opengl,
+    _backend: &Opengl,
 ) {
     match event.response_type() & !0x80 {
         // New window created
@@ -58,7 +58,7 @@ pub fn handle_event(
                 unsafe { xcb::cast_event(&event) };
             let win = ev.window();
             if let Some(true) = Window::is_mapped(conn, win) {
-                let index = windows.iter().position(|w| w.id == win).unwrap();
+                let _index = windows.iter().position(|w| w.id == win).unwrap();
             }
         }
         // Window's stack position changed
@@ -67,7 +67,7 @@ pub fn handle_event(
                 unsafe { xcb::cast_event(&event) };
             let win = ev.window();
             if let Some(true) = Window::is_mapped(conn, win) {
-                let index = windows.iter().position(|w| w.id == win).unwrap();
+                let _index = windows.iter().position(|w| w.id == win).unwrap();
             }
         }
         // TODO
@@ -85,7 +85,7 @@ pub fn handle_event(
         // Window property changed
         // TODO
         xcb::PROPERTY_NOTIFY => {
-            let ev: &xcb::PropertyNotifyEvent =
+            let _ev: &xcb::PropertyNotifyEvent =
                 unsafe { xcb::cast_event(&event) };
         }
         _ => {}

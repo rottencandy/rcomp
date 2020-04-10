@@ -6,11 +6,10 @@ mod init;
 mod window;
 
 use backend::opengl;
-use std::error::Error;
 use std::process;
 use window::Window;
 
-fn main() -> Result<(), Box<dyn Error>> {
+fn main() {
     let (conn, screen_num) = xcb::Connection::connect_with_xlib_display()
         .unwrap_or_else(|err| {
             eprintln!("Error opening connection to X server: {}", err);
@@ -50,6 +49,4 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
         }
     }
-
-    Ok(())
 }

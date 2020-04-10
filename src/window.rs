@@ -37,6 +37,7 @@ impl Window {
     }
 
     /// Creates a new `Window`
+    //TODO: use Result
     pub fn new(conn: &xcb::Connection, win: xcb::Window) -> Window {
         let geometry = xcb::get_geometry(conn, win).get_reply().unwrap();
         let attrs = xcb::get_window_attributes(conn, win).get_reply().unwrap();

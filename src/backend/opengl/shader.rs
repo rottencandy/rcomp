@@ -4,7 +4,7 @@ use std::ffi::{CStr, CString};
 use std::ptr::null_mut;
 
 pub struct Shader {
-    id: gl::types::GLuint,
+    pub id: gl::types::GLuint,
 }
 
 impl Shader {
@@ -14,9 +14,6 @@ impl Shader {
     ) -> Result<Shader, String> {
         let id = shader_from_source(source, kind)?;
         Ok(Shader { id })
-    }
-    pub fn id(&self) -> gl::types::GLuint {
-        self.id
     }
     pub fn from_vert_source(source: &CStr) -> Result<Shader, String> {
         Shader::from_source(source, gl::VERTEX_SHADER)
@@ -76,14 +73,14 @@ fn create_whitespace_cstring_with_len(len: usize) -> CString {
 }
 
 pub struct Program {
-    id: gl::types::GLuint,
+    pub id: gl::types::GLuint,
 }
 
 impl Program {
     pub fn from_shaders(shaders: &[Shader]) -> Result<Program, String> {
         let program_id = unsafe { gl::CreateProgram() };
         for shader in shaders {
-            unsafe { gl::AttachShader(program_id, shader.id()) };
+            unsafe { gl::AttachShader(program_id, shader.id) };
         }
         unsafe {
             gl::LinkProgram(program_id);
@@ -111,19 +108,21 @@ impl Program {
         }
         for shader in shaders {
             unsafe {
-                gl::DetachShader(program_id, shader.id());
+                gl::DetachShader(program_id, shader.id);
             }
         }
         Ok(Program { id: program_id })
-    }
-    pub fn id(&self) -> gl::types::GLuint {
-        self.id
     }
 
     pub fn set_used(&self) {
         unsafe {
             gl::UseProgram(self.id);
         }
+    }
+
+    pub fn get_attrib_location(&self, name: &str) -> gl::types::GLint {
+        let name_arr = CString::new(name).unwrap().as_ptr();
+        unsafe { gl::GetAttribLocation(self.id, name_arr) }
     }
 }
 
