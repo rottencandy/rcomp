@@ -80,18 +80,26 @@ pub mod window {
 }
 
 pub mod extensions {
-    use xcb::{composite, randr};
+    use xcb::{composite, randr, shape, xfixes};
     /// Checks that the required extensions are present in the server.
     // Use hashmap with loop?
     // TODO: Check extension versions, aside from existence
     pub fn verify(conn: &xcb::Connection) -> Result<(), &str> {
         conn.prefetch_extension_data(composite::id());
         conn.prefetch_extension_data(randr::id());
+        conn.prefetch_extension_data(xfixes::id());
+        conn.prefetch_extension_data(shape::id());
         if !conn.get_extension_data(composite::id()).unwrap().present() {
             return Err("composite");
         }
         if !conn.get_extension_data(randr::id()).unwrap().present() {
             return Err("randr");
+        }
+        if !conn.get_extension_data(xfixes::id()).unwrap().present() {
+            return Err("xfixes");
+        }
+        if !conn.get_extension_data(shape::id()).unwrap().present() {
+            return Err("shape");
         }
         Ok(())
     }
@@ -118,6 +126,34 @@ pub mod extensions {
         // get the overlay window id
         let overlay =
             composite::get_overlay_window(conn, screen.root()).get_reply()?;
+
+        // Make all mouse events fall through
+        let region = conn.generate_id();
+        xfixes::create_region_checked(
+            conn,
+            region,
+            &[xcb::Rectangle::new(0, 0, 0, 0)],
+        )
+        .request_check().expect("error creating region ~~~~~~~~~~~~~~~~~~~");
+        xfixes::set_window_shape_region(
+            conn,
+            overlay.overlay_win(),
+            shape::SK_BOUNDING as u8,
+            0,
+            0,
+            xfixes::REGION_NONE,
+        )
+        .request_check()?;
+        xfixes::set_window_shape_region(
+            conn,
+            overlay.overlay_win(),
+            shape::SK_INPUT as u8,
+            0,
+            0,
+            region,
+        )
+        .request_check()?;
+        xfixes::destroy_region(conn, region).request_check()?;
 
         Ok(overlay.overlay_win())
     }

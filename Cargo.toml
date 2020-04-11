@@ -7,6 +7,6 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-xcb = { version = "0.9", features = ["composite", "randr", "xlib_xcb", "dri2"] }
+xcb = { version = "0.9", features = ["composite", "randr", "xlib_xcb", "dri2", "xfixes", "shape"] }
 x11 = { version = "2.18.2", features = ["xlib", "glx"] }
 gl = "0.14.0"
