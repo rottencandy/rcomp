@@ -39,13 +39,17 @@ fn main() {
             eprintln!("Unable to initialize backend: {}", err);
             process::exit(1);
         });
-    //backend.draw();
 
     loop {
         match conn.wait_for_event() {
             None => break,
             Some(event) => {
-                event::handle_event(&conn, &event, &mut windows, &backend)
+                event::handle_event(&conn, &event, &mut windows, &backend);
+                backend.clear();
+                for win in windows.iter_mut().filter(|w| w.mapped) {
+                    win.update_pixmap(&conn);
+                    backend.draw_window(win);
+                }
             }
         }
     }

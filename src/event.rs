@@ -5,7 +5,7 @@ pub fn handle_event(
     conn: &xcb::Connection,
     event: &xcb::GenericEvent,
     windows: &mut Vec<Window>,
-    _backend: &Opengl,
+    backend: &Opengl,
 ) {
     match event.response_type() & !0x80 {
         // New window created
@@ -20,7 +20,7 @@ pub fn handle_event(
         xcb::DESTROY_NOTIFY => {
             let ev: &xcb::DestroyNotifyEvent =
                 unsafe { xcb::cast_event(&event) };
-            windows.retain(|w| w.id == ev.window());
+            windows.retain(|w| w.id != ev.window());
         }
         // Window property(size, border, position, stack order) changed
         xcb::CONFIGURE_NOTIFY => {
@@ -80,6 +80,7 @@ pub fn handle_event(
             // To optimize redraws, we only update on the last Expose event
             if let Some(true) = Window::is_mapped(conn, win) {
                 if ev.count() == 0 {}
+                let _index = windows.iter().position(|w| w.id == win).unwrap();
             }
         }
         // Window property changed

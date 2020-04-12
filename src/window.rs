@@ -1,3 +1,5 @@
+use xcb::composite;
+
 pub struct Window {
     pub id: xcb::Window,
     pub x: i16,
@@ -5,6 +7,7 @@ pub struct Window {
     pub width: u16,
     pub height: u16,
     pub mapped: bool,
+    pub pixmap: xcb::Pixmap,
 }
 
 impl Window {
@@ -17,10 +20,6 @@ impl Window {
             Vec::with_capacity(tree.children_len() as usize);
         for win in tree.children() {
             windows.push(Window::new(conn, *win));
-            //let pix = conn.generate_id();
-            //composite::name_window_pixmap(conn, *win, pix)
-            //    .request_check()
-            //    .unwrap();
         }
         windows
     }
@@ -48,6 +47,7 @@ impl Window {
             width: geometry.width(),
             height: geometry.height(),
             mapped: attrs.map_state() == xcb::MAP_STATE_VIEWABLE as u8,
+            pixmap: conn.generate_id(),
         }
     }
 
@@ -58,5 +58,11 @@ impl Window {
         self.y = geometry.y();
         self.width = geometry.width();
         self.height = geometry.height();
+    }
+
+    pub fn update_pixmap(&mut self, conn: &xcb::Connection) {
+        self.pixmap = conn.generate_id();
+        composite::name_window_pixmap(conn, self.id, self.pixmap);
+        conn.flush();
     }
 }
