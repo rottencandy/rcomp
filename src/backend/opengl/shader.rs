@@ -120,6 +120,16 @@ impl Program {
         }
     }
 
+    pub fn create_uniform(&self, name: &str) -> Uniform {
+        let id = unsafe {
+            gl::GetUniformLocation(
+                self.id,
+                CString::new(name).unwrap().as_ptr(),
+            )
+        };
+        Uniform { id }
+    }
+
     pub fn get_attrib_location(&self, name: &str) -> gl::types::GLint {
         let name_arr = CString::new(name).unwrap().as_ptr();
         unsafe { gl::GetAttribLocation(self.id, name_arr) }
@@ -130,6 +140,18 @@ impl Drop for Program {
     fn drop(&mut self) {
         unsafe {
             gl::DeleteProgram(self.id);
+        }
+    }
+}
+
+pub struct Uniform {
+    id: gl::types::GLint,
+}
+
+impl Uniform {
+    pub fn data_3f(&self, data: &[f32]) {
+        unsafe {
+            gl::Uniform3f(self.id, data[0], data[1], data[2]);
         }
     }
 }

@@ -2,15 +2,17 @@ extern crate gl;
 extern crate x11;
 
 mod buffer;
-mod opengl;
+pub mod setup;
 mod shader;
+mod texture;
 
 use std::ffi::CString;
 use std::ptr::null_mut;
 
 use crate::window::Window;
-use buffer::{Buffer, VertexArray};
+use buffer::{Buffer, ElementBuffer, VertexArray};
 use shader::{Program, Shader};
+use texture::Texture;
 use x11::{glx::*, xlib};
 
 pub struct Opengl<'a> {
@@ -18,6 +20,7 @@ pub struct Opengl<'a> {
     pub conn: &'a xcb::Connection,
     pub dpy: *mut xlib::Display,
     pub draw_win: xlib::XID,
+    pub fbconfig: GLXFBConfig,
 }
 
 impl<'a> Opengl<'a> {
@@ -26,9 +29,9 @@ impl<'a> Opengl<'a> {
         screens: i32,
         win: xcb::Window,
     ) -> Result<Opengl, &str> {
-        opengl::verify_extensions(conn, screens)?;
+        setup::verify_extensions(conn, screens)?;
         // setup framebuffer context
-        let fbc = opengl::get_glxfbconfig(
+        let fbc = setup::get_glxfbconfig(
             conn.get_raw_dpy(),
             screens,
             &[
@@ -59,20 +62,20 @@ impl<'a> Opengl<'a> {
         )?;
 
         conn.flush();
-        let _glx_bind_tex_image: opengl::GLXBindTexImageEXT = unsafe {
-            std::mem::transmute(opengl::load_gl_func("glXBindTexImageEXT"))
+        let glx_bind_tex_image: setup::GLXBindTexImageEXT = unsafe {
+            std::mem::transmute(setup::load_gl_func("glXBindTexImageEXT"))
         };
-        let _glx_release_tex_image: opengl::GLXReleaseTexImageEXT = unsafe {
-            std::mem::transmute(opengl::load_gl_func("glXReleaseTexImageEXT"))
+        let glx_release_tex_image: setup::GLXReleaseTexImageEXT = unsafe {
+            std::mem::transmute(setup::load_gl_func("glXReleaseTexImageEXT"))
         };
 
         // load all function pointers
-        unsafe { gl::load_with(|n| opengl::load_gl_func(&n)) };
+        unsafe { gl::load_with(|n| setup::load_gl_func(&n)) };
 
         if !gl::GenVertexArrays::is_loaded() {
             return Err("no GL3 support available!");
         }
-        let ctx = opengl::create_glx_context(conn, fbc)?;
+        let ctx = setup::create_glx_context(conn, fbc)?;
 
         unsafe {
             glXMakeCurrent(conn.get_raw_dpy(), win as xlib::XID, ctx);
@@ -123,7 +126,7 @@ impl<'a> Opengl<'a> {
             vao.bind();
             gl::DrawArrays(gl::TRIANGLES, 0, 3);
 
-            opengl::check_gl_error();
+            setup::check_gl_error();
             glXSwapBuffers(conn.get_raw_dpy(), win as xlib::XID);
         }
 
@@ -134,20 +137,86 @@ impl<'a> Opengl<'a> {
             conn,
             dpy: conn.get_raw_dpy(),
             draw_win: win as xlib::XID,
+            fbconfig: fbc,
         })
     }
 
     pub fn draw_window(&self, window: &Window) {
+        let vert = Shader::from_vert_source(
+            &CString::new(include_str!("opengl/window.vert")).unwrap(),
+        )
+        .unwrap();
+        let frag = Shader::from_frag_source(
+            &CString::new(include_str!("opengl/window.frag")).unwrap(),
+        )
+        .unwrap();
+        let prog = Program::from_shaders(&[vert, frag]).unwrap();
+        prog.set_used();
+
+        let vao = VertexArray::new();
+        vao.bind();
+
+        let vbo = Buffer::new();
+        vbo.bind();
+        vbo.load_data(&[
+            // top left
+            (window.x as f32) / 1366.0 * 2.0 - 1.0,
+            (window.y as f32) / 768.0 * -2.0 + 1.0,
+            0.0, 0.0,
+            // top right
+            (window.x as f32 + window.width as f32) / 1366.0 * 2.0 - 1.0,
+            (window.y as f32) / 768.0 * -2.0 + 1.0,
+            1.0, 0.0,
+            // bottom left
+            (window.x as f32) / 1366.0 * 2.0 - 1.0,
+            (window.y as f32 + window.height as f32) / 768.0 * -2.0 + 1.0,
+            0.0, 1.0,
+            // bottom right
+            (window.x as f32 + window.width as f32) / 1366.0 * 2.0 - 1.0,
+            (window.y as f32 + window.height as f32) / 768.0 * -2.0 + 1.0,
+            1.0, 1.0,
+        ]);
+
+        VertexArray::enable(0);
+        VertexArray::attrib_pointer(0, 2, 4, 0);
+        VertexArray::enable(1);
+        VertexArray::attrib_pointer(1, 2, 4, 2);
+
+        let ebo = ElementBuffer::new();
+        ebo.bind();
+        ebo.load_data(&[0, 1, 2, 1, 2, 3]);
+
+        let texture =
+            Texture::from_pixmap(window.pixmap, self.dpy, self.fbconfig);
         unsafe {
-            glXMakeCurrent(self.dpy, self.draw_win, self.ctx);
-            gl::ClearColor(0.3f32, 0.3f32, 0.4f32, 1.0f32);
-            gl::Clear(gl::COLOR_BUFFER_BIT);
+            gl::TexParameteri(
+                gl::TEXTURE_2D,
+                gl::TEXTURE_MIN_FILTER,
+                gl::NEAREST as i32,
+            );
+            gl::TexParameteri(
+                gl::TEXTURE_2D,
+                gl::TEXTURE_MAG_FILTER,
+                gl::NEAREST as i32,
+            );
+
+            gl::ClearColor(0.4, 0.4, 0.5, 1.0);
+            gl::DrawElements(
+                gl::TRIANGLES,
+                6,
+                gl::UNSIGNED_INT,
+                std::ptr::null(),
+            );
             gl::Flush();
-            opengl::check_gl_error();
+            setup::check_gl_error();
             glXSwapBuffers(self.dpy, self.draw_win);
-            glXMakeCurrent(self.dpy, 0, null_mut());
         }
         self.conn.flush();
+    }
+    pub fn clear(&self) {
+        unsafe {
+            gl::Clear(gl::COLOR_BUFFER_BIT);
+        }
     }
 }
 

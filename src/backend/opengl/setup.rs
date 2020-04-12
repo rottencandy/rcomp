@@ -5,7 +5,7 @@ use std::ffi::{CStr, CString};
 use std::os::raw::{c_int, c_void};
 use std::ptr::null_mut;
 
-use x11::{glx::*, xlib};
+pub use x11::{glx::*, xlib};
 
 // Minimum reuqired version for glxCreateContextAttribs extension
 const GLX_CONTEXT_MAJOR_VERSION_ARB: u32 = 0x2091;
