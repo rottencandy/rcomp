@@ -20,7 +20,7 @@ impl Buffer {
                 (data.len() * std::mem::size_of::<T>())
                     as gl::types::GLsizeiptr,
                 data.as_ptr() as *const gl::types::GLvoid,
-                gl::STATIC_DRAW,
+                gl::STREAM_DRAW,
             );
         }
     }
@@ -66,7 +66,8 @@ impl VertexArray {
         offset: usize,
     ) {
         let stride = (stride * std::mem::size_of::<f32>()) as gl::types::GLint;
-        let offset = (offset * std::mem::size_of::<f32>()) as *const gl::types::GLvoid;
+        let offset =
+            (offset * std::mem::size_of::<f32>()) as *const gl::types::GLvoid;
         unsafe {
             gl::VertexAttribPointer(
                 index,

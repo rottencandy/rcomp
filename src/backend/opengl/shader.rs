@@ -149,9 +149,9 @@ pub struct Uniform {
 }
 
 impl Uniform {
-    pub fn data_3f(&self, data: &[f32]) {
+    pub fn data_2f(&self, data: &[f32]) {
         unsafe {
-            gl::Uniform3f(self.id, data[0], data[1], data[2]);
+            gl::Uniform2f(self.id, data[0], data[1]);
         }
     }
 }

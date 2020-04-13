@@ -83,7 +83,8 @@ pub mod extensions {
     use xcb::{composite, randr, shape};
     /// Checks that the required extensions are present in the server.
     // Use hashmap with loop?
-    // TODO: Check extension versions, aside from existence
+    // TODO: Check extension versions, along with existence
+    // TODO: use macros
     pub fn verify(conn: &xcb::Connection) -> Result<(), &str> {
         conn.prefetch_extension_data(composite::id());
         conn.prefetch_extension_data(randr::id());
