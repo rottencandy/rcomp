@@ -30,7 +30,6 @@ fn main() {
 
     let _win = init::window::create_window(&conn, screen_num);
 
-    // TODO use linked list
     let mut windows = Window::fetch_windows(&conn);
     init::window::request_events(&conn);
 
@@ -48,6 +47,7 @@ fn main() {
                 backend.clear();
                 for win in windows.iter_mut().filter(|w| w.mapped) {
                     win.update_pixmap(&conn);
+                    win.get_opacity(&conn);
                     backend.draw_window(win);
                 }
             }

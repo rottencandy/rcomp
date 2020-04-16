@@ -153,18 +153,26 @@ impl<'a> Opengl<'a> {
             0.0,
             0.0,
             // top right
-            (window.x as f32 + window.width as f32),
+            (window.x as f32
+                + window.width as f32
+                + window.border_width as f32 * 2.0),
             (window.y as f32),
             1.0,
             0.0,
             // bottom left
             (window.x as f32),
-            (window.y as f32 + window.height as f32),
+            (window.y as f32
+                + window.height as f32
+                + window.border_width as f32 * 2.0),
             0.0,
             1.0,
             // bottom right
-            (window.x as f32 + window.width as f32),
-            (window.y as f32 + window.height as f32),
+            (window.x as f32
+                + window.width as f32
+                + window.border_width as f32 * 2.0),
+            (window.y as f32
+                + window.height as f32
+                + window.border_width as f32 * 2.0),
             1.0,
             1.0,
         ]);
