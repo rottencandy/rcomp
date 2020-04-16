@@ -89,7 +89,7 @@ impl Window {
     }
 
     pub fn get_opacity(&self, conn: &xcb::Connection) {
-        let atom = xcb::intern_atom(conn, true, &"_NET_WM_WINDOW_OPACITY")
+        let atom = xcb::intern_atom(conn, false, &"_NET_WM_WINDOW_OPACITY")
             .get_reply()
             .unwrap()
             .atom();
@@ -115,7 +115,6 @@ impl Window {
                 if data.type_() == xcb::ATOM_CARDINAL
                     && data.format() == 32
                     && data.value_len() == 1
-                    && data.bytes_after() == 0
                 {
                     //return data.value<f32>()[0]
                     let val: u32 = data.value()[0];

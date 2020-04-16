@@ -5,11 +5,11 @@ pub mod window {
     /// returns the window ID.
     pub fn create_window(
         conn: &xcb::Connection,
-        screen_num: i32,
     ) -> xcb::Window {
         let setup = conn.get_setup();
         let win = conn.generate_id();
         let screen = setup.roots().last().unwrap();
+        let screen_num = setup.roots_len();
 
         xcb::create_window(
             conn,
@@ -33,7 +33,7 @@ pub mod window {
     }
 
     /// Try and get the ownership of _NET_WM_CM_Sn atoms, one for each screen.
-    fn grab_atoms(conn: &xcb::Connection, win: xcb::Window, screens: i32) {
+    fn grab_atoms(conn: &xcb::Connection, win: xcb::Window, screens: u8) {
         for screen in 0..screens {
             let atom = xcb::intern_atom(
                 conn,
@@ -57,6 +57,16 @@ pub mod window {
             xcb::set_selection_owner(conn, win, atom, xcb::CURRENT_TIME);
             // TODO: Check if ownership was successfully grabbed
             conn.flush();
+
+            if xcb::get_selection_owner(conn, atom)
+                .get_reply()
+                .unwrap()
+                .owner()
+                != win
+            {
+                eprintln!("Unable to get _NET_WM_CM_Sn ownership");
+                process::exit(1);
+            }
         }
     }
 

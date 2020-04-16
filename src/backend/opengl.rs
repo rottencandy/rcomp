@@ -7,7 +7,6 @@ mod shader;
 mod texture;
 
 use std::ffi::CString;
-use std::ptr::null_mut;
 
 use crate::window::Window;
 use buffer::{Buffer, ElementBuffer, VertexArray};

@@ -10,6 +10,12 @@ use std::process;
 use window::Window;
 
 fn main() {
+    // NOTE: This screen_num is seemingly not the same as xcb's
+    // setup.roots_len() This one only works for xlib's OpenGL ctx
+    // calls (which strangely do not work with xcb's screen_num)
+    // 
+    // Use setup.roots_len() for all other xcb-only calls
+    // (or they behave unexpectedly)
     let (conn, screen_num) = xcb::Connection::connect_with_xlib_display()
         .unwrap_or_else(|err| {
             eprintln!("Error opening connection to X server: {}", err);
@@ -28,7 +34,7 @@ fn main() {
             process::exit(1);
         });
 
-    let _win = init::window::create_window(&conn, screen_num);
+    let _win = init::window::create_window(&conn);
 
     let mut windows = Window::fetch_windows(&conn);
     init::window::request_events(&conn);
