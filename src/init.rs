@@ -3,9 +3,7 @@ pub mod window {
 
     /// Creates a dummy window, used to get ownership of atoms,
     /// returns the window ID.
-    pub fn create_window(
-        conn: &xcb::Connection,
-    ) -> xcb::Window {
+    pub fn create_window(conn: &xcb::Connection) -> xcb::Window {
         let setup = conn.get_setup();
         let win = conn.generate_id();
         let screen = setup.roots().last().unwrap();

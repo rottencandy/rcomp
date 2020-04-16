@@ -13,7 +13,7 @@ fn main() {
     // NOTE: This screen_num is seemingly not the same as xcb's
     // setup.roots_len() This one only works for xlib's OpenGL ctx
     // calls (which strangely do not work with xcb's screen_num)
-    // 
+    //
     // Use setup.roots_len() for all other xcb-only calls
     // (or they behave unexpectedly)
     let (conn, screen_num) = xcb::Connection::connect_with_xlib_display()
@@ -53,7 +53,6 @@ fn main() {
                 backend.clear();
                 for win in windows.iter_mut().filter(|w| w.mapped) {
                     win.update_pixmap(&conn);
-                    win.get_opacity(&conn);
                     backend.draw_window(win);
                 }
             }

@@ -23,7 +23,7 @@ impl Window {
         for win in tree.children() {
             match Window::new(conn, *win) {
                 Ok(w) => windows.push(w),
-                Err(e) => println!("Error getting window info: {}", e),
+                Err(_) => println!("Unable to get info for win: {}", win),
             };
         }
         windows
@@ -86,44 +86,5 @@ impl Window {
         self.pixmap = conn.generate_id();
         composite::name_window_pixmap(conn, self.id, self.pixmap);
         conn.flush();
-    }
-
-    pub fn get_opacity(&self, conn: &xcb::Connection) {
-        let atom = xcb::intern_atom(conn, false, &"_NET_WM_WINDOW_OPACITY")
-            .get_reply()
-            .unwrap()
-            .atom();
-        match xcb::get_property(
-            conn,
-            false,
-            self.id,
-            atom,
-            xcb::ATOM_CARDINAL,
-            0,
-            1,
-        )
-        .get_reply()
-        {
-            Ok(data) => {
-                println!(
-                    "type: {}, format: {}, len: {}, after: {}",
-                    data.type_(),
-                    data.format(),
-                    data.value_len(),
-                    data.bytes_after()
-                );
-                if data.type_() == xcb::ATOM_CARDINAL
-                    && data.format() == 32
-                    && data.value_len() == 1
-                {
-                    //return data.value<f32>()[0]
-                    let val: u32 = data.value()[0];
-                    println!("Got! {}", val);
-                }
-            }
-            _ => {
-                println!("No data");
-            }
-        };
     }
 }

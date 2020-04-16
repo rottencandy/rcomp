@@ -91,7 +91,11 @@ impl<'a> Opengl<'a> {
         let ctx = setup::create_glx_context(conn, fbconfig)?;
 
         unsafe {
+            // Set ctx as the current one used for drawing
             glXMakeCurrent(conn.get_raw_dpy(), win as xlib::XID, ctx);
+            // Use pixmap texture's alpha to calculate transparency
+            gl::Enable(gl::BLEND);
+            gl::BlendFunc(gl::ONE, gl::ONE_MINUS_SRC_ALPHA);
         }
 
         // Load shaders
