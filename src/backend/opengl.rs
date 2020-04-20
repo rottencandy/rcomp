@@ -4,7 +4,7 @@ extern crate x11;
 mod buffer;
 pub mod setup;
 mod shader;
-mod texture;
+pub mod texture;
 
 use std::ffi::CString;
 
@@ -180,12 +180,26 @@ impl<'a> Opengl<'a> {
             1.0,
         ]);
 
+        window.texture.bind();
+        unsafe {
+            gl::DrawElements(
+                gl::TRIANGLES,
+                6,
+                gl::UNSIGNED_INT,
+                std::ptr::null(),
+            );
+            setup::check_gl_error();
+        }
+    }
+
+    pub fn update_glxpixmap(&self, win: &mut Window) {
+        win.update_pixmap(self.conn);
         // Generate texture from pixmap
-        let glxpixmap = unsafe {
+        win.glxpixmap = unsafe {
             setup::glXCreatePixmap(
                 self.dpy,
                 self.fbconfig,
-                window.pixmap as u64,
+                win.pixmap as u64,
                 [
                     GLX_TEXTURE_TARGET_EXT,
                     GLX_TEXTURE_2D_EXT,
@@ -196,12 +210,15 @@ impl<'a> Opengl<'a> {
                 .as_ptr(),
             )
         };
-        let texture = Texture::new();
-        texture.bind();
+    }
+
+    pub fn update_window_texture(&self, win: &mut Window) {
+        win.texture = Texture::new();
+        win.texture.bind();
         unsafe {
             (self.glx_bind_tex_image)(
                 self.dpy,
-                glxpixmap,
+                win.glxpixmap,
                 0x20de,
                 std::ptr::null(),
             );
@@ -219,22 +236,13 @@ impl<'a> Opengl<'a> {
                 gl::NEAREST as i32,
             );
         }
-
-        unsafe {
-            gl::ClearColor(0.4, 0.4, 0.5, 1.0);
-            gl::DrawElements(
-                gl::TRIANGLES,
-                6,
-                gl::UNSIGNED_INT,
-                std::ptr::null(),
-            );
-            setup::check_gl_error();
-            glXSwapBuffers(self.dpy, self.draw_win);
-        }
     }
-    pub fn clear(&self) {
+
+    pub fn render(&self) {
         unsafe {
+            glXSwapBuffers(self.dpy, self.draw_win);
             gl::Clear(gl::COLOR_BUFFER_BIT);
+            //gl::ClearColor(0.4, 0.4, 0.5, 1.0);
         }
     }
 }

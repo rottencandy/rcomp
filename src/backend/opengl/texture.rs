@@ -1,5 +1,6 @@
 extern crate gl;
 
+#[derive(Default)]
 pub struct Texture {
     pub id: gl::types::GLuint,
     is_pixmap: bool,
