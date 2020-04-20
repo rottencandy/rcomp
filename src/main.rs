@@ -50,11 +50,6 @@ fn main() {
             None => break,
             Some(event) => {
                 event::handle_event(&conn, &event, &mut windows, &backend);
-                backend.clear();
-                for win in windows.iter_mut().filter(|w| w.mapped) {
-                    win.update_pixmap(&conn);
-                    backend.draw_window(win);
-                }
             }
         }
     }

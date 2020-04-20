@@ -13,7 +13,15 @@ pub fn handle_event(
             let ev: &xcb::CreateNotifyEvent =
                 unsafe { xcb::cast_event(&event) };
             match Window::new(conn, ev.window()) {
-                Ok(win) => windows.push(win),
+                Ok(win) => {
+                    windows.push(win);
+                    for win in windows.iter_mut().filter(|w| w.mapped) {
+                        backend.update_glxpixmap(win);
+                        backend.update_window_texture(win);
+                        backend.draw_window(win);
+                    }
+                    backend.render();
+                }
                 Err(e) => println!("Cannot get created window info: {}", e),
             };
         }
@@ -23,6 +31,12 @@ pub fn handle_event(
             let ev: &xcb::DestroyNotifyEvent =
                 unsafe { xcb::cast_event(&event) };
             windows.retain(|w| w.id != ev.window());
+            for win in windows.iter_mut().filter(|w| w.mapped) {
+                backend.update_glxpixmap(win);
+                backend.update_window_texture(win);
+                backend.draw_window(win);
+            }
+            backend.render();
         }
         // Window property(size, border, position, stack order) changed
         xcb::CONFIGURE_NOTIFY => {
@@ -38,8 +52,14 @@ pub fn handle_event(
                 // TODO: also check border_width, override_redirect
                 if w.mapped && ev.width() != w.width || ev.height() != w.height
                 {
-                    w.update_pixmap(conn);
+                    backend.update_glxpixmap(w);
                 }
+                for win in windows.iter_mut().filter(|w| w.mapped) {
+                    backend.update_glxpixmap(win);
+                    backend.update_window_texture(win);
+                    backend.draw_window(win);
+                }
+                backend.render();
             } else {
                 println!("No window found: {}", win_id);
             }
@@ -52,7 +72,13 @@ pub fn handle_event(
                 let w = &mut windows[index];
                 w.mapped = true;
                 // New pixmap is generated for every map
-                w.update_pixmap(conn);
+                    backend.update_glxpixmap(w);
+                for win in windows.iter_mut().filter(|w| w.mapped) {
+                    backend.update_glxpixmap(win);
+                    backend.update_window_texture(win);
+                    backend.draw_window(win);
+                }
+                backend.render();
             } else {
                 println!("No window found: {}", win_id);
             }
@@ -64,6 +90,12 @@ pub fn handle_event(
             let win_id = ev.window();
             if let Some(index) = windows.iter().position(|w| w.id == win_id) {
                 windows[index].mapped = false;
+                for win in windows.iter_mut().filter(|w| w.mapped) {
+                    backend.update_glxpixmap(win);
+                    backend.update_window_texture(win);
+                    backend.draw_window(win);
+                }
+                backend.render();
             } else {
                 println!("No window found: {}", win_id);
             }
@@ -77,7 +109,7 @@ pub fn handle_event(
             // Check that the parent is root
             // Remove from list if not
             if let Some(index) = windows.iter().position(|w| w.id == win_id) {
-                windows[index].mapped = false;
+                //windows[index].mapped = false;
             } else {
                 // TODO: Add this window to the list
             }
@@ -95,6 +127,12 @@ pub fn handle_event(
                 } else {
                     windows.insert(0, win);
                 }
+                for win in windows.iter_mut().filter(|w| w.mapped) {
+                    backend.update_glxpixmap(win);
+                    backend.update_window_texture(win);
+                    backend.draw_window(win);
+                }
+                backend.render();
             } else {
                 println!("No window found: {}", win_id);
             }
@@ -109,6 +147,12 @@ pub fn handle_event(
             if ev.count() != 0 {
                 return;
             }
+            for win in windows.iter_mut().filter(|w| w.mapped) {
+                backend.update_glxpixmap(win);
+                backend.update_window_texture(win);
+                backend.draw_window(win);
+            }
+            backend.render();
             // TODO: check if window is root
         }
         // Window property changed
