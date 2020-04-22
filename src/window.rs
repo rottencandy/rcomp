@@ -1,6 +1,6 @@
-use xcb::composite;
-use std::os::raw::c_ulong;
 use crate::opengl::texture::Texture;
+use std::os::raw::c_ulong;
+use xcb::{composite, damage};
 
 pub struct Window {
     pub id: xcb::Window,
@@ -88,9 +88,18 @@ impl Window {
         self.override_redirect = event.override_redirect();
     }
 
+    // TODO: check the requests
     pub fn update_pixmap(&mut self, conn: &xcb::Connection) {
         self.pixmap = conn.generate_id();
         composite::name_window_pixmap(conn, self.id, self.pixmap);
+        let damage = conn.generate_id();
+        damage::create(
+            conn,
+            damage,
+            self.pixmap,
+            damage::REPORT_LEVEL_NON_EMPTY as u8,
+        )
+        .request_check();
         conn.flush();
     }
 }

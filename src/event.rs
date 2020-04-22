@@ -3,15 +3,15 @@ use crate::window::Window;
 
 pub fn handle_event(
     conn: &xcb::Connection,
-    event: &xcb::GenericEvent,
+    baseEvent: &xcb::GenericEvent,
     windows: &mut Vec<Window>,
     backend: &Opengl,
 ) {
-    match event.response_type() & !0x80 {
+    match baseEvent.response_type() & !0x80 {
         // New window created
         xcb::CREATE_NOTIFY => {
             let ev: &xcb::CreateNotifyEvent =
-                unsafe { xcb::cast_event(&event) };
+                unsafe { xcb::cast_event(&baseEvent) };
             match Window::new(conn, ev.window()) {
                 Ok(win) => {
                     windows.push(win);
@@ -29,7 +29,7 @@ pub fn handle_event(
         // For any window, an event for every child is sent out first
         xcb::DESTROY_NOTIFY => {
             let ev: &xcb::DestroyNotifyEvent =
-                unsafe { xcb::cast_event(&event) };
+                unsafe { xcb::cast_event(&baseEvent) };
             windows.retain(|w| w.id != ev.window());
             for win in windows.iter_mut().filter(|w| w.mapped) {
                 backend.update_glxpixmap(win);
@@ -41,7 +41,7 @@ pub fn handle_event(
         // Window property(size, border, position, stack order) changed
         xcb::CONFIGURE_NOTIFY => {
             let ev: &xcb::ConfigureNotifyEvent =
-                unsafe { xcb::cast_event(&event) };
+                unsafe { xcb::cast_event(&baseEvent) };
             let win_id = ev.window();
             if let Some(index) = windows.iter().position(|w| w.id == win_id) {
                 // TODO: Check if this is root window and is updated
@@ -55,7 +55,6 @@ pub fn handle_event(
                     backend.update_glxpixmap(w);
                 }
                 for win in windows.iter_mut().filter(|w| w.mapped) {
-                    backend.update_glxpixmap(win);
                     backend.update_window_texture(win);
                     backend.draw_window(win);
                 }
@@ -66,15 +65,15 @@ pub fn handle_event(
         }
         // Existing window mapped
         xcb::MAP_NOTIFY => {
-            let ev: &xcb::MapNotifyEvent = unsafe { xcb::cast_event(&event) };
+            let ev: &xcb::MapNotifyEvent =
+                unsafe { xcb::cast_event(&baseEvent) };
             let win_id = ev.window();
             if let Some(index) = windows.iter().position(|w| w.id == win_id) {
                 let w = &mut windows[index];
                 w.mapped = true;
                 // New pixmap is generated for every map
-                    backend.update_glxpixmap(w);
+                backend.update_glxpixmap(w);
                 for win in windows.iter_mut().filter(|w| w.mapped) {
-                    backend.update_glxpixmap(win);
                     backend.update_window_texture(win);
                     backend.draw_window(win);
                 }
@@ -86,12 +85,11 @@ pub fn handle_event(
         // Existing window unmapped
         xcb::UNMAP_NOTIFY => {
             let ev: &xcb::UnmapNotifyEvent =
-                unsafe { xcb::cast_event(&event) };
+                unsafe { xcb::cast_event(&baseEvent) };
             let win_id = ev.window();
             if let Some(index) = windows.iter().position(|w| w.id == win_id) {
                 windows[index].mapped = false;
                 for win in windows.iter_mut().filter(|w| w.mapped) {
-                    backend.update_glxpixmap(win);
                     backend.update_window_texture(win);
                     backend.draw_window(win);
                 }
@@ -103,7 +101,7 @@ pub fn handle_event(
         // Window's parent changed
         xcb::REPARENT_NOTIFY => {
             let ev: &xcb::ReparentNotifyEvent =
-                unsafe { xcb::cast_event(&event) };
+                unsafe { xcb::cast_event(&baseEvent) };
             let win_id = ev.window();
             // TODO:
             // Check that the parent is root
@@ -117,7 +115,7 @@ pub fn handle_event(
         // Window's stack position changed
         xcb::CIRCULATE_NOTIFY => {
             let ev: &xcb::CirculateNotifyEvent =
-                unsafe { xcb::cast_event(&event) };
+                unsafe { xcb::cast_event(&baseEvent) };
             let win_id = ev.window();
             if let Some(index) = windows.iter().position(|w| w.id == win_id) {
                 let win = windows.remove(index);
@@ -128,7 +126,6 @@ pub fn handle_event(
                     windows.insert(0, win);
                 }
                 for win in windows.iter_mut().filter(|w| w.mapped) {
-                    backend.update_glxpixmap(win);
                     backend.update_window_texture(win);
                     backend.draw_window(win);
                 }
@@ -139,7 +136,7 @@ pub fn handle_event(
         }
         // Window unhidden
         xcb::EXPOSE => {
-            let ev: &xcb::ExposeEvent = unsafe { xcb::cast_event(&event) };
+            let ev: &xcb::ExposeEvent = unsafe { xcb::cast_event(&baseEvent) };
             let win_id = ev.window();
             // count specifies the number of remaining Expose events which
             // follow for this window
@@ -155,14 +152,16 @@ pub fn handle_event(
             backend.render();
             // TODO: check if window is root
         }
-        // Window property changed
+        // Window property(atom) changed
         // TODO
         xcb::PROPERTY_NOTIFY => {
             let _ev: &xcb::PropertyNotifyEvent =
-                unsafe { xcb::cast_event(&event) };
+                unsafe { xcb::cast_event(&baseEvent) };
         }
-        // TODO: check for damage notify event
         // TODO: check for root property changes
-        _ => {}
+        _ => {
+            // Window damage detected
+            println!("Got unknown event: {}", baseEvent.response_type());
+        }
     }
 }
