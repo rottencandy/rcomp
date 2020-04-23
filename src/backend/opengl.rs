@@ -148,7 +148,7 @@ impl<'a> Opengl<'a> {
     }
 
     pub fn draw_window(&self, window: &Window) {
-        // TODO: I heard geometry shaders were made for this kind of stuff
+        // TODO: Look into geometry shader
         self.vbo.load_data(&[
             // top left
             (window.x as f32),
@@ -194,7 +194,6 @@ impl<'a> Opengl<'a> {
 
     pub fn update_glxpixmap(&self, win: &mut Window) {
         win.update_pixmap(self.conn);
-        // Generate texture from pixmap
         win.glxpixmap = unsafe {
             setup::glXCreatePixmap(
                 self.dpy,

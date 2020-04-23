@@ -14,6 +14,7 @@ pub struct Window {
     pub pixmap: xcb::Pixmap,
     pub glxpixmap: c_ulong,
     pub texture: Texture,
+    pub damage: damage::Damage,
 }
 
 impl Window {
@@ -63,6 +64,7 @@ impl Window {
             pixmap: conn.generate_id(),
             glxpixmap: 0,
             texture: Default::default(),
+            damage: 0,
         })
     }
 
@@ -89,17 +91,23 @@ impl Window {
     }
 
     // TODO: check the requests
-    pub fn update_pixmap(&mut self, conn: &xcb::Connection) {
+    pub fn update_pixmap(
+        &mut self,
+        conn: &xcb::Connection,
+    ) -> Result<(), xcb::GenericError> {
         self.pixmap = conn.generate_id();
-        composite::name_window_pixmap(conn, self.id, self.pixmap);
-        let damage = conn.generate_id();
+        composite::name_window_pixmap(conn, self.id, self.pixmap)
+            .request_check()?;
+
+        damage::destroy(conn, self.damage);
+        self.damage = conn.generate_id();
         damage::create(
             conn,
-            damage,
+            self.damage,
             self.pixmap,
             damage::REPORT_LEVEL_NON_EMPTY as u8,
         )
-        .request_check();
-        conn.flush();
+        .request_check()?;
+        Ok(())
     }
 }

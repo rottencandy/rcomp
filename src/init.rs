@@ -94,10 +94,10 @@ pub mod extensions {
     // TODO: Check extension versions, along with existence
     // TODO: use macros
     pub fn verify(conn: &xcb::Connection) -> Result<(), &str> {
-        conn.prefetch_extension_data(composite::id());
-        conn.prefetch_extension_data(randr::id());
-        conn.prefetch_extension_data(shape::id());
-        conn.prefetch_extension_data(damage::id());
+        //conn.prefetch_extension_data(composite::id());
+        //conn.prefetch_extension_data(randr::id());
+        //conn.prefetch_extension_data(shape::id());
+        //conn.prefetch_extension_data(damage::id());
         if !conn.get_extension_data(composite::id()).unwrap().present() {
             return Err("composite");
         }
@@ -107,11 +107,9 @@ pub mod extensions {
         if !conn.get_extension_data(shape::id()).unwrap().present() {
             return Err("shape");
         }
-        if !conn.get_extension_data(composite::id()).unwrap().present() {
+        if !conn.get_extension_data(damage::id()).unwrap().present() {
             return Err("damage");
         }
-        let e = conn.get_extension_data(damage::id()).unwrap().first_event();
-        println!("damage event = {}", e);
         Ok(())
     }
 

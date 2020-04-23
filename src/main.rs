@@ -22,6 +22,9 @@ fn main() {
             process::exit(1);
         });
     conn.set_event_queue_owner(xcb::EventQueueOwner::Xcb);
+    let root =
+        Window::new(&conn, conn.get_setup().roots().last().unwrap().root())
+            .unwrap();
 
     init::extensions::verify(&conn).unwrap_or_else(|err| {
         eprintln!("Error: extension `{}` not found.", err);
@@ -45,11 +48,25 @@ fn main() {
             process::exit(1);
         });
 
+    // initial render
+    for win in windows.iter_mut().filter(|w| w.mapped) {
+        backend.update_glxpixmap(win);
+        backend.update_window_texture(win);
+        backend.draw_window(win);
+    }
+    backend.render();
+
     loop {
         match conn.wait_for_event() {
             None => break,
             Some(event) => {
-                event::handle_event(&conn, &event, &mut windows, &backend);
+                event::handle_event(
+                    &conn,
+                    &event,
+                    &mut windows,
+                    &backend,
+                    &root,
+                );
             }
         }
     }
