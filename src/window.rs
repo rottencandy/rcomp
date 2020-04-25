@@ -1,6 +1,6 @@
 use crate::opengl::texture::Texture;
 use std::os::raw::c_ulong;
-use xcb::{composite, damage};
+use xcb::{composite, damage, shape};
 
 pub struct Window {
     pub id: xcb::Window,
@@ -32,17 +32,6 @@ impl Window {
             };
         }
         windows
-    }
-
-    /// Checks wether a window is mapped
-    pub fn is_mapped(
-        conn: &xcb::Connection,
-        win: xcb::Window,
-    ) -> Option<bool> {
-        if let Ok(attr) = xcb::get_window_attributes(conn, win).get_reply() {
-            return Some(attr.map_state() == xcb::MAP_STATE_VIEWABLE as u8);
-        }
-        None
     }
 
     /// Creates a new `Window`
@@ -99,15 +88,20 @@ impl Window {
         composite::name_window_pixmap(conn, self.id, self.pixmap)
             .request_check()?;
 
+        // Recreate damage region tracker
         damage::destroy(conn, self.damage);
         self.damage = conn.generate_id();
         damage::create(
             conn,
             self.damage,
-            self.pixmap,
+            self.id,
             damage::REPORT_LEVEL_NON_EMPTY as u8,
         )
         .request_check()?;
+
+        // Request shape events
+        // TODO: this only needs to be done once per window
+        shape::select_input(conn, self.id, true).request_check()?;
         Ok(())
     }
 }

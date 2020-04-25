@@ -90,7 +90,6 @@ pub mod window {
 pub mod extensions {
     use xcb::{composite, damage, randr, shape};
     /// Checks that the required extensions are present in the server.
-    // Use hashmap with loop?
     // TODO: Check extension versions, along with existence
     // TODO: use macros
     pub fn verify(conn: &xcb::Connection) -> Result<(), &str> {
@@ -111,6 +110,12 @@ pub mod extensions {
             return Err("damage");
         }
         Ok(())
+    }
+
+    pub fn get_events(conn: &xcb::Connection) -> (u8, u8) {
+        let damage_data = conn.get_extension_data(damage::id()).unwrap();
+        let shape_data = conn.get_extension_data(shape::id()).unwrap();
+        (damage_data.first_event(), shape_data.first_event())
     }
 
     /// Uses the composite extension to request redirection of all windows

@@ -30,6 +30,7 @@ fn main() {
         eprintln!("Error: extension `{}` not found.", err);
         process::exit(1);
     });
+    let (damage_event, shape_event) = init::extensions::get_events(&conn);
 
     let overlay =
         init::extensions::redirect_subwindows(&conn).unwrap_or_else(|err| {
@@ -66,6 +67,8 @@ fn main() {
                     &mut windows,
                     &backend,
                     &root,
+                    damage_event,
+                    shape_event,
                 );
             }
         }

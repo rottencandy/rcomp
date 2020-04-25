@@ -19,7 +19,7 @@ const GLX_TEXTURE_TARGET_EXT: i32 = 0x20D6;
 const GLX_TEXTURE_2D_EXT: i32 = 0x20DC;
 const GLX_TEXTURE_FORMAT_EXT: i32 = 0x20D5;
 const GLX_TEXTURE_FORMAT_RGBA_EXT: i32 = 0x20DA;
-const GLXFRONT_LEFT_EXT: i32 = 0x20DE;
+const GLX_FRONT_LEFT_EXT: i32 = 0x20DE;
 
 pub struct Opengl<'a> {
     pub ctx: *mut __GLXcontextRec,
@@ -212,13 +212,20 @@ impl<'a> Opengl<'a> {
     }
 
     pub fn update_window_texture(&self, win: &mut Window) {
+        unsafe {
+            (self.glx_release_tex_image)(
+                self.dpy,
+                win.glxpixmap,
+                GLX_FRONT_LEFT_EXT,
+            );
+        }
         win.texture = Texture::new();
         win.texture.bind();
         unsafe {
             (self.glx_bind_tex_image)(
                 self.dpy,
                 win.glxpixmap,
-                0x20de,
+                GLX_FRONT_LEFT_EXT,
                 std::ptr::null(),
             );
         }

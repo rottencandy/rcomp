@@ -8,10 +8,13 @@ pub fn handle_event(
     windows: &mut Vec<Window>,
     backend: &Opengl,
     root_win: &Window,
+    damage_event: u8,
+    shape_event: u8,
 ) {
-    match base_event.response_type() & !0x80 {
+    match base_event.response_type() {
         // New window created
         xcb::CREATE_NOTIFY => {
+            println!("CREATE_NOTIFY");
             let ev: &xcb::CreateNotifyEvent =
                 unsafe { xcb::cast_event(&base_event) };
             match Window::new(conn, ev.window()) {
@@ -22,7 +25,9 @@ pub fn handle_event(
                     }
                     windows.push(win);
                 }
-                Err(e) => println!("Cannot get created window info: {}", e),
+                Err(e) => {
+                    println!("CreateNotify: cannot get window info: {}", e)
+                }
             };
             for win in windows.iter_mut().filter(|w| w.mapped) {
                 backend.draw_window(win);
@@ -32,6 +37,7 @@ pub fn handle_event(
         // Window destroyed
         // For any window, an event for every child is sent out first
         xcb::DESTROY_NOTIFY => {
+            println!("DESTROY_NOTIFY");
             let ev: &xcb::DestroyNotifyEvent =
                 unsafe { xcb::cast_event(&base_event) };
             windows.retain(|w| w.id != ev.window());
@@ -43,7 +49,9 @@ pub fn handle_event(
         }
         // Window property(size, border, position, stack order) changed
         // TODO: restack
+        // TODO: check if window is root
         xcb::CONFIGURE_NOTIFY => {
+            println!("CONFIGURE_NOTIFY");
             let ev: &xcb::ConfigureNotifyEvent =
                 unsafe { xcb::cast_event(&base_event) };
             let win_id = ev.window();
@@ -72,6 +80,7 @@ pub fn handle_event(
         }
         // Existing window mapped
         xcb::MAP_NOTIFY => {
+            println!("MAP_NOTIFY");
             let ev: &xcb::MapNotifyEvent =
                 unsafe { xcb::cast_event(&base_event) };
             let win_id = ev.window();
@@ -91,6 +100,7 @@ pub fn handle_event(
         }
         // Existing window unmapped
         xcb::UNMAP_NOTIFY => {
+            println!("UNMAP_NOTIFY");
             let ev: &xcb::UnmapNotifyEvent =
                 unsafe { xcb::cast_event(&base_event) };
             let win_id = ev.window();
@@ -106,6 +116,7 @@ pub fn handle_event(
         }
         // Window's parent changed
         xcb::REPARENT_NOTIFY => {
+            println!("REPARENT_NOTIFY");
             let event: &xcb::ReparentNotifyEvent =
                 unsafe { xcb::cast_event(&base_event) };
             let win_id = event.window();
@@ -131,6 +142,7 @@ pub fn handle_event(
         }
         // Window's stack position changed
         xcb::CIRCULATE_NOTIFY => {
+            println!("CIRCULATE_NOTIFY");
             let ev: &xcb::CirculateNotifyEvent =
                 unsafe { xcb::cast_event(&base_event) };
             let win_id = ev.window();
@@ -152,6 +164,7 @@ pub fn handle_event(
         }
         // Window unhidden
         xcb::EXPOSE => {
+            println!("EXPOSE");
             let ev: &xcb::ExposeEvent =
                 unsafe { xcb::cast_event(&base_event) };
             // TODO: check if window is root
@@ -171,6 +184,7 @@ pub fn handle_event(
         // Window property(atom) changed
         // TODO
         xcb::PROPERTY_NOTIFY => {
+            println!("PROPERTY_NOTIFY");
             let _ev: &xcb::PropertyNotifyEvent =
                 unsafe { xcb::cast_event(&base_event) };
         }
@@ -178,14 +192,13 @@ pub fn handle_event(
         _ => {
             // Window damage detected
             if base_event.response_type() == damage::NOTIFY {
+                println!("DamageNotify");
                 let event: &damage::NotifyEvent =
                     unsafe { xcb::cast_event(&base_event) };
                 let win_id = event.drawable();
-                println!(
-                    "DamageNotify: Got event: {}, {}",
-                    base_event.response_type(),
-                    win_id
-                );
+                damage::subtract(conn, event.damage(), xcb::NONE, xcb::NONE)
+                    .request_check()
+                    .unwrap();
                 if let Some(index) =
                     windows.iter().position(|w| w.id == win_id)
                 {
@@ -193,6 +206,10 @@ pub fn handle_event(
                 } else {
                     println!("DamageNotify: no window in list: {}", win_id);
                 }
+                for win in windows.iter_mut().filter(|w| w.mapped) {
+                    backend.draw_window(win);
+                }
+                backend.render();
             }
         }
     }
