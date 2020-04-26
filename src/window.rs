@@ -57,8 +57,8 @@ impl Window {
         })
     }
 
-    /// Update the properties of an existing `Window`
-    pub fn update(&mut self, conn: &xcb::Connection) {
+    /// Update the geometry properties of an existing `Window`
+    pub fn update_geometry(&mut self, conn: &xcb::Connection) {
         let geometry = xcb::get_geometry(conn, self.id).get_reply().unwrap();
         self.x = geometry.x();
         self.y = geometry.y();

@@ -33,8 +33,8 @@ pub struct Opengl<'a> {
     glx_release_tex_image: setup::GLXReleaseTexImageEXT,
 
     vbo: Buffer,
-    vao: VertexArray,
-    ebo: ElementBuffer,
+    _vao: VertexArray,
+    _ebo: ElementBuffer,
 }
 
 impl<'a> Opengl<'a> {
@@ -141,9 +141,9 @@ impl<'a> Opengl<'a> {
 
             // Even if we don't directly use these, they have to
             // remain in scope so their context doesn't get deleted
-            vbo,
-            vao,
-            ebo,
+            vbo: vbo,
+            _vao: vao,
+            _ebo: ebo,
         })
     }
 
@@ -193,7 +193,7 @@ impl<'a> Opengl<'a> {
     }
 
     pub fn update_glxpixmap(&self, win: &mut Window) {
-        win.update_pixmap(self.conn);
+        win.update_pixmap(self.conn).unwrap();
         win.glxpixmap = unsafe {
             setup::glXCreatePixmap(
                 self.dpy,

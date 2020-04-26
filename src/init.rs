@@ -53,7 +53,6 @@ pub mod window {
             }
 
             xcb::set_selection_owner(conn, win, atom, xcb::CURRENT_TIME);
-            // TODO: Check if ownership was successfully grabbed
             conn.flush();
 
             if xcb::get_selection_owner(conn, atom)
@@ -110,12 +109,6 @@ pub mod extensions {
             return Err("damage");
         }
         Ok(())
-    }
-
-    pub fn get_events(conn: &xcb::Connection) -> (u8, u8) {
-        let damage_data = conn.get_extension_data(damage::id()).unwrap();
-        let shape_data = conn.get_extension_data(shape::id()).unwrap();
-        (damage_data.first_event(), shape_data.first_event())
     }
 
     /// Uses the composite extension to request redirection of all windows

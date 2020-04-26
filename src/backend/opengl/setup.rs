@@ -69,7 +69,6 @@ pub fn create_glx_context(
             xlib::True,
             &context_attribs[0] as *const c_int,
         );
-        conn.flush();
         if ctx.is_null() || ctx_error_occurred {
             return Err("error when creating gl-3.0 context");
         }

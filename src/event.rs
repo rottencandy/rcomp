@@ -2,14 +2,16 @@ use crate::opengl::Opengl;
 use crate::window::Window;
 use xcb::damage;
 
+use std::time::{Duration, Instant};
+
 pub fn handle_event(
     conn: &xcb::Connection,
     base_event: &xcb::GenericEvent,
     windows: &mut Vec<Window>,
     backend: &Opengl,
     root_win: &Window,
-    damage_event: u8,
-    shape_event: u8,
+    last_render: &mut Instant,
+    refresh_rate: &Duration,
 ) {
     match base_event.response_type() {
         // New window created
@@ -206,10 +208,13 @@ pub fn handle_event(
                 } else {
                     println!("DamageNotify: no window in list: {}", win_id);
                 }
-                for win in windows.iter_mut().filter(|w| w.mapped) {
-                    backend.draw_window(win);
+                if last_render.elapsed() > *refresh_rate {
+                    *last_render = Instant::now();
+                    for win in windows.iter_mut().filter(|w| w.mapped) {
+                        backend.draw_window(win);
+                    }
+                    backend.render();
                 }
-                backend.render();
             }
         }
     }

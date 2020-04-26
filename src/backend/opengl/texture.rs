@@ -3,14 +3,13 @@ extern crate gl;
 #[derive(Default)]
 pub struct Texture {
     pub id: gl::types::GLuint,
-    is_pixmap: bool,
 }
 
 impl Texture {
     pub fn new() -> Texture {
         let mut id: gl::types::GLuint = 0;
         unsafe { gl::GenTextures(1, &mut id) }
-        Texture { id, is_pixmap: false }
+        Texture { id }
     }
     pub fn bind(&self) {
         unsafe { gl::BindTexture(gl::TEXTURE_2D, self.id) }

@@ -9,6 +9,8 @@ use backend::opengl;
 use std::process;
 use window::Window;
 
+use std::time::{Duration, Instant};
+
 fn main() {
     // NOTE: This screen_num is seemingly not the same as xcb's
     // setup.roots_len() This one only works for xlib's OpenGL ctx
@@ -30,7 +32,6 @@ fn main() {
         eprintln!("Error: extension `{}` not found.", err);
         process::exit(1);
     });
-    let (damage_event, shape_event) = init::extensions::get_events(&conn);
 
     let overlay =
         init::extensions::redirect_subwindows(&conn).unwrap_or_else(|err| {
@@ -56,6 +57,8 @@ fn main() {
         backend.draw_window(win);
     }
     backend.render();
+    let mut last_render = Instant::now();
+    let refresh_rate = Duration::from_millis((1000.0 / 60.0) as u64);
 
     loop {
         match conn.wait_for_event() {
@@ -67,8 +70,8 @@ fn main() {
                     &mut windows,
                     &backend,
                     &root,
-                    damage_event,
-                    shape_event,
+                    &mut last_render,
+                    &refresh_rate,
                 );
             }
         }
