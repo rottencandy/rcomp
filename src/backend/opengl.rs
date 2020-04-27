@@ -193,7 +193,18 @@ impl<'a> Opengl<'a> {
     }
 
     pub fn update_glxpixmap(&self, win: &mut Window) {
+        // The texture is only updated on `update_window_texture`
+        // so no need to bind yet
+        win.texture = Texture::new();
         win.update_pixmap(self.conn).unwrap();
+        // Don't have to release everytime we bind
+        unsafe {
+            (self.glx_release_tex_image)(
+                self.dpy,
+                win.glxpixmap,
+                GLX_FRONT_LEFT_EXT,
+            );
+        }
         win.glxpixmap = unsafe {
             setup::glXCreatePixmap(
                 self.dpy,
@@ -212,14 +223,6 @@ impl<'a> Opengl<'a> {
     }
 
     pub fn update_window_texture(&self, win: &mut Window) {
-        unsafe {
-            (self.glx_release_tex_image)(
-                self.dpy,
-                win.glxpixmap,
-                GLX_FRONT_LEFT_EXT,
-            );
-        }
-        win.texture = Texture::new();
         win.texture.bind();
         unsafe {
             (self.glx_bind_tex_image)(
