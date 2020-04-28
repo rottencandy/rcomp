@@ -201,11 +201,11 @@ pub fn handle_event(
                     backend.update_window_texture(&mut windows[i]);
                 }
                 if last_render.elapsed() > *refresh_rate {
-                    *last_render = Instant::now();
                     for win in windows.iter_mut().filter(|w| w.mapped) {
                         backend.draw_window(win);
                     }
                     backend.render();
+                    *last_render = Instant::now();
                 }
             }
         }

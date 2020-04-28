@@ -32,7 +32,7 @@ fn main() {
     }
     backend.render();
     let mut last_render = Instant::now();
-    let refresh_rate = Duration::from_millis(10);
+    let refresh_rate = Duration::from_millis(17);
 
     loop {
         match state.conn.wait_for_event() {
