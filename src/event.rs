@@ -1,15 +1,15 @@
 use crate::opengl::Opengl;
+use crate::state::State;
 use crate::window::Window;
 use xcb::damage;
 
 use std::time::{Duration, Instant};
 
 pub fn handle_event(
-    conn: &xcb::Connection,
-    base_event: &xcb::GenericEvent,
+    state: &State,
+    base_event: xcb::GenericEvent,
     windows: &mut Vec<Window>,
     backend: &Opengl,
-    root_win: &Window,
     last_render: &mut Instant,
     refresh_rate: &Duration,
 ) {
@@ -19,7 +19,7 @@ pub fn handle_event(
             println!("CREATE_NOTIFY");
             let ev: &xcb::CreateNotifyEvent =
                 unsafe { xcb::cast_event(&base_event) };
-            match Window::new(conn, ev.window()) {
+            match Window::new(&state.conn, ev.window()) {
                 Ok(mut win) => {
                     if win.mapped {
                         backend.update_glxpixmap(&mut win);
@@ -57,8 +57,8 @@ pub fn handle_event(
             let ev: &xcb::ConfigureNotifyEvent =
                 unsafe { xcb::cast_event(&base_event) };
             let win_id = ev.window();
-            if let Some(index) = windows.iter().position(|w| w.id == win_id) {
-                let w = &mut windows[index];
+            if let Some(i) = windows.iter().position(|w| w.id == win_id) {
+                let w = &mut windows[i];
                 // New pixmap is generated for every resize
                 if w.mapped && ev.width() != w.width
                     || ev.height() != w.height
@@ -69,7 +69,7 @@ pub fn handle_event(
                     backend.update_window_texture(w);
                 }
                 w.update_using_event(ev);
-            } else if win_id == root_win.id {
+            } else if win_id == state.root.id {
                 //backend.update_glxpixmap(win_id);
                 //backend.update_window_texture(win_id);
             } else {
@@ -85,9 +85,8 @@ pub fn handle_event(
             println!("MAP_NOTIFY");
             let ev: &xcb::MapNotifyEvent =
                 unsafe { xcb::cast_event(&base_event) };
-            let win_id = ev.window();
-            if let Some(index) = windows.iter().position(|w| w.id == win_id) {
-                let w = &mut windows[index];
+            if let Some(i) = windows.iter().position(|w| w.id == ev.window()) {
+                let w = &mut windows[i];
                 w.mapped = true;
                 // New pixmap is generated for every map
                 backend.update_glxpixmap(w);
@@ -96,8 +95,6 @@ pub fn handle_event(
                     backend.draw_window(win);
                 }
                 backend.render();
-            } else {
-                println!("MapNotify: No window in list: {}", win_id);
             }
         }
         // Existing window unmapped
@@ -105,15 +102,12 @@ pub fn handle_event(
             println!("UNMAP_NOTIFY");
             let ev: &xcb::UnmapNotifyEvent =
                 unsafe { xcb::cast_event(&base_event) };
-            let win_id = ev.window();
-            if let Some(index) = windows.iter().position(|w| w.id == win_id) {
-                windows[index].mapped = false;
+            if let Some(i) = windows.iter().position(|w| w.id == ev.window()) {
+                windows[i].mapped = false;
                 for win in windows.iter_mut().filter(|w| w.mapped) {
                     backend.draw_window(win);
                 }
                 backend.render();
-            } else {
-                println!("UnmapNotify: No window in list: {}", win_id);
             }
         }
         // Window's parent changed
@@ -122,10 +116,9 @@ pub fn handle_event(
             let event: &xcb::ReparentNotifyEvent =
                 unsafe { xcb::cast_event(&base_event) };
             let win_id = event.window();
-            if event.parent() == root_win.id {
+            if event.parent() == state.root.id {
                 if let None = windows.iter().position(|w| w.id == win_id) {
-                } else {
-                    match Window::new(conn, win_id) {
+                    match Window::new(&state.conn, win_id) {
                         Ok(mut win) => {
                             if win.mapped {
                                 backend.update_glxpixmap(&mut win);
@@ -143,13 +136,13 @@ pub fn handle_event(
             }
         }
         // Window's stack position changed
+        // Currently does not do anything useful
         xcb::CIRCULATE_NOTIFY => {
             println!("CIRCULATE_NOTIFY");
             let ev: &xcb::CirculateNotifyEvent =
                 unsafe { xcb::cast_event(&base_event) };
-            let win_id = ev.window();
-            if let Some(index) = windows.iter().position(|w| w.id == win_id) {
-                let win = windows.remove(index);
+            if let Some(i) = windows.iter().position(|w| w.id == ev.window()) {
+                let win = windows.remove(i);
                 // Window is placed below all its siblings
                 if ev.place() == xcb::PLACE_ON_BOTTOM as u8 {
                     windows.push(win);
@@ -160,8 +153,6 @@ pub fn handle_event(
                     backend.draw_window(win);
                 }
                 backend.render();
-            } else {
-                println!("CirculateNotify: No window in list: {}", win_id);
             }
         }
         // Window unhidden
@@ -172,8 +163,7 @@ pub fn handle_event(
             // TODO: check if window is root
             //let win_id = ev.window();
 
-            // count specifies the number of remaining Expose events which
-            // follow for this window
+            // Check number of remaining expose events
             // To optimize redraws, we only update on the last Expose event
             if ev.count() != 0 {
                 return;
@@ -197,16 +187,18 @@ pub fn handle_event(
                 println!("DamageNotify");
                 let event: &damage::NotifyEvent =
                     unsafe { xcb::cast_event(&base_event) };
-                let win_id = event.drawable();
-                damage::subtract(conn, event.damage(), xcb::NONE, xcb::NONE)
-                    .request_check()
-                    .unwrap();
-                if let Some(index) =
-                    windows.iter().position(|w| w.id == win_id)
+                damage::subtract(
+                    &state.conn,
+                    event.damage(),
+                    xcb::NONE,
+                    xcb::NONE,
+                )
+                .request_check()
+                .unwrap();
+                if let Some(i) =
+                    windows.iter().position(|w| w.id == event.drawable())
                 {
-                    backend.update_window_texture(&mut windows[index]);
-                } else {
-                    println!("DamageNotify: no window in list: {}", win_id);
+                    backend.update_window_texture(&mut windows[i]);
                 }
                 if last_render.elapsed() > *refresh_rate {
                     *last_render = Instant::now();

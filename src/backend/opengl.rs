@@ -6,6 +6,7 @@ pub mod setup;
 mod shader;
 pub mod texture;
 
+use crate::state::State;
 use std::ffi::CString;
 
 use crate::window::Window;
@@ -38,16 +39,13 @@ pub struct Opengl<'a> {
 }
 
 impl<'a> Opengl<'a> {
-    pub fn init(
-        conn: &xcb::Connection,
-        screens: i32,
-        win: xcb::Window,
-    ) -> Result<Opengl, &str> {
-        setup::verify_extensions(conn, screens)?;
+    pub fn init(state: &State) -> Result<Opengl, &str> {
+        setup::verify_extensions(&state.conn, state.xlib_screens)?;
+        let raw_dpy = state.conn.get_raw_dpy();
         // setup framebuffer context
         let fbconfig = setup::get_glxfbconfig(
-            conn.get_raw_dpy(),
-            screens,
+            raw_dpy,
+            state.xlib_screens,
             &[
                 GLX_X_RENDERABLE,
                 1,
@@ -88,11 +86,11 @@ impl<'a> Opengl<'a> {
         if !gl::GenVertexArrays::is_loaded() {
             return Err("no GL3 support available!");
         }
-        let ctx = setup::create_glx_context(conn, fbconfig)?;
+        let ctx = setup::create_glx_context(&state.conn, fbconfig)?;
 
         unsafe {
             // Set ctx as the current one used for drawing
-            glXMakeCurrent(conn.get_raw_dpy(), win as xlib::XID, ctx);
+            glXMakeCurrent(raw_dpy, state.overlay as xlib::XID, ctx);
             // Use pixmap texture's alpha to calculate transparency
             gl::Enable(gl::BLEND);
             gl::BlendFunc(gl::ONE, gl::ONE_MINUS_SRC_ALPHA);
@@ -132,9 +130,9 @@ impl<'a> Opengl<'a> {
 
         Ok(Opengl {
             ctx,
-            conn,
-            dpy: conn.get_raw_dpy(),
-            draw_win: win as xlib::XID,
+            conn: &state.conn,
+            dpy: raw_dpy,
+            draw_win: state.overlay as xlib::XID,
             fbconfig,
             glx_bind_tex_image,
             glx_release_tex_image,
