@@ -1,13 +1,14 @@
 extern crate gl;
 extern crate x11;
 
-mod buffer;
+pub mod buffer;
 pub mod setup;
 mod shader;
 pub mod texture;
 
 use crate::state::State;
 use std::ffi::CString;
+use std::os::raw::c_ulong;
 
 use crate::window::Window;
 use buffer::{Buffer, ElementBuffer, VertexArray};
@@ -178,7 +179,7 @@ impl<'a> Opengl<'a> {
             1.0,
         ]);
 
-        window.texture.bind();
+        window.context.texture.bind();
         unsafe {
             gl::DrawElements(
                 gl::TRIANGLES,
@@ -193,17 +194,17 @@ impl<'a> Opengl<'a> {
     pub fn update_glxpixmap(&self, win: &mut Window) {
         // The texture is only updated on `update_window_texture`
         // so no need to bind yet
-        win.texture = Texture::new();
+        win.context.texture = Texture::new();
         win.update_pixmap(self.conn).unwrap();
         // Don't have to release everytime we bind
         unsafe {
             (self.glx_release_tex_image)(
                 self.dpy,
-                win.glxpixmap,
+                win.context.glxpixmap,
                 GLX_FRONT_LEFT_EXT,
             );
         }
-        win.glxpixmap = unsafe {
+        win.context.glxpixmap = unsafe {
             setup::glXCreatePixmap(
                 self.dpy,
                 self.fbconfig,
@@ -221,11 +222,11 @@ impl<'a> Opengl<'a> {
     }
 
     pub fn update_window_texture(&self, win: &mut Window) {
-        win.texture.bind();
+        win.context.texture.bind();
         unsafe {
             (self.glx_bind_tex_image)(
                 self.dpy,
-                win.glxpixmap,
+                win.context.glxpixmap,
                 GLX_FRONT_LEFT_EXT,
                 std::ptr::null(),
             );
@@ -259,4 +260,11 @@ impl<'a> Drop for Opengl<'a> {
         unsafe { glXDestroyContext(self.dpy, self.ctx) };
         self.conn.flush();
     }
+}
+
+#[derive(Default)]
+pub struct BackendContext {
+    pub glxpixmap: c_ulong,
+    pub texture: Texture,
+    pub vbo: Buffer,
 }

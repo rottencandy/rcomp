@@ -1,5 +1,4 @@
-use crate::opengl::texture::Texture;
-use std::os::raw::c_ulong;
+use crate::opengl::{buffer::Buffer, texture::Texture, BackendContext};
 use xcb::{composite, damage, shape};
 
 pub struct Window {
@@ -12,8 +11,7 @@ pub struct Window {
     pub mapped: bool,
     pub override_redirect: bool,
     pub pixmap: xcb::Pixmap,
-    pub glxpixmap: c_ulong,
-    pub texture: Texture,
+    pub context: BackendContext,
     pub damage: damage::Damage,
 }
 
@@ -51,8 +49,7 @@ impl Window {
             mapped: attrs.map_state() == xcb::MAP_STATE_VIEWABLE as u8,
             override_redirect: attrs.override_redirect(),
             pixmap: conn.generate_id(),
-            glxpixmap: 0,
-            texture: Default::default(),
+            context: Default::default(),
             damage: 0,
         })
     }

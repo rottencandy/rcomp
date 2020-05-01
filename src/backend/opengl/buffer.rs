@@ -1,5 +1,6 @@
 extern crate gl;
 
+#[derive(Default)]
 pub struct Buffer {
     id: gl::types::GLuint,
 }
