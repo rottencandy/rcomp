@@ -7,6 +7,7 @@ mod state;
 mod window;
 
 use backend::opengl;
+use backend::opengl::buffer::Buffer;
 use state::State;
 use std::process;
 use window::Window;
@@ -26,13 +27,17 @@ fn main() {
 
     // initial render
     for win in windows.iter_mut().filter(|w| w.mapped) {
-        backend.update_glxpixmap(win);
-        backend.update_window_texture(win);
+        //TODO: enum-based event handler
+        backend.init_window(win);
+        backend.update_pos(win);
+        backend.update_pixmap(win);
+        backend.update_texture(win);
         backend.draw_window(win);
     }
     backend.render();
     let mut last_render = Instant::now();
-    let refresh_rate = Duration::from_millis(17);
+    // 60 FPS = 16.666 ms
+    let update_frequency = Duration::from_millis(17);
 
     loop {
         match state.conn.wait_for_event() {
@@ -44,7 +49,7 @@ fn main() {
                     &mut windows,
                     &backend,
                     &mut last_render,
-                    &refresh_rate,
+                    &update_frequency,
                 );
             }
         }

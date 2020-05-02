@@ -22,8 +22,10 @@ pub fn handle_event(
             match Window::new(&state.conn, ev.window()) {
                 Ok(mut win) => {
                     if win.mapped {
-                        backend.update_glxpixmap(&mut win);
-                        backend.update_window_texture(&mut win);
+                        backend.init_window(&mut win);
+                        backend.update_pos(&win);
+                        backend.update_pixmap(&mut win);
+                        backend.update_texture(&mut win);
                     }
                     windows.push(win);
                 }
@@ -65,13 +67,14 @@ pub fn handle_event(
                     || ev.override_redirect() != w.override_redirect
                     || ev.border_width() != w.border_width
                 {
-                    backend.update_glxpixmap(w);
-                    backend.update_window_texture(w);
+                    backend.update_pixmap(w);
+                    backend.update_texture(w);
                 }
                 w.update_using_event(ev);
+                backend.update_pos(w);
             } else if win_id == state.root.id {
-                //backend.update_glxpixmap(win_id);
-                //backend.update_window_texture(win_id);
+                //backend.update_pixmap(win_id);
+                //backend.update_texture(win_id);
             } else {
                 println!("ConfigureEvent: No window in list: {}", win_id);
             }
@@ -88,9 +91,11 @@ pub fn handle_event(
             if let Some(i) = windows.iter().position(|w| w.id == ev.window()) {
                 let w = &mut windows[i];
                 w.mapped = true;
+                backend.init_window(w);
                 // New pixmap is generated for every map
-                backend.update_glxpixmap(w);
-                backend.update_window_texture(w);
+                backend.update_pos(w);
+                backend.update_pixmap(w);
+                backend.update_texture(w);
                 for win in windows.iter_mut().filter(|w| w.mapped) {
                     backend.draw_window(win);
                 }
@@ -121,8 +126,9 @@ pub fn handle_event(
                     match Window::new(&state.conn, win_id) {
                         Ok(mut win) => {
                             if win.mapped {
-                                backend.update_glxpixmap(&mut win);
-                                backend.update_window_texture(&mut win);
+                                backend.update_pos(&win);
+                                backend.update_pixmap(&mut win);
+                                backend.update_texture(&mut win);
                             }
                             windows.push(win);
                         }
@@ -184,7 +190,6 @@ pub fn handle_event(
         _ => {
             // Window damage detected
             if base_event.response_type() == damage::NOTIFY {
-                println!("DamageNotify");
                 let event: &damage::NotifyEvent =
                     unsafe { xcb::cast_event(&base_event) };
                 damage::subtract(
@@ -198,7 +203,7 @@ pub fn handle_event(
                 if let Some(i) =
                     windows.iter().position(|w| w.id == event.drawable())
                 {
-                    backend.update_window_texture(&mut windows[i]);
+                    backend.update_texture(&mut windows[i]);
                 }
                 if last_render.elapsed() > *refresh_rate {
                     for win in windows.iter_mut().filter(|w| w.mapped) {

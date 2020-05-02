@@ -1,4 +1,4 @@
-use crate::opengl::{buffer::Buffer, texture::Texture, BackendContext};
+use crate::opengl::BackendContext;
 use xcb::{composite, damage, shape};
 
 pub struct Window {

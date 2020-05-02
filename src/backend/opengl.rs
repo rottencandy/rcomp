@@ -27,7 +27,7 @@ pub struct Opengl<'a> {
     pub ctx: *mut __GLXcontextRec,
     pub conn: &'a xcb::Connection,
     pub dpy: *mut xlib::Display,
-    pub draw_win: xlib::XID,
+    pub target_win: xlib::XID,
     pub fbconfig: GLXFBConfig,
 
     // I don't yet know enough Rust to do this any other way
@@ -107,7 +107,7 @@ impl<'a> Opengl<'a> {
         )
         .unwrap();
         let shader_program = Program::from_shaders(&[vert, frag]).unwrap();
-        // Provide screen dimensions
+        // TODO: Provide screen dimensions
         let screen_dim = shader_program.create_uniform("screenDim");
         shader_program.set_used();
         screen_dim.data_2f(&[1366.0, 768.0]);
@@ -133,7 +133,7 @@ impl<'a> Opengl<'a> {
             ctx,
             conn: &state.conn,
             dpy: raw_dpy,
-            draw_win: state.overlay as xlib::XID,
+            target_win: state.overlay as xlib::XID,
             fbconfig,
             glx_bind_tex_image,
             glx_release_tex_image,
@@ -146,53 +146,15 @@ impl<'a> Opengl<'a> {
         })
     }
 
-    pub fn draw_window(&self, window: &Window) {
-        // TODO: Look into geometry shader
-        self.vbo.load_data(&[
-            // top left
-            (window.x as f32),
-            (window.y as f32),
-            0.0,
-            0.0,
-            // top right
-            (window.x as f32
-                + window.width as f32
-                + window.border_width as f32 * 2.0),
-            (window.y as f32),
-            1.0,
-            0.0,
-            // bottom left
-            (window.x as f32),
-            (window.y as f32
-                + window.height as f32
-                + window.border_width as f32 * 2.0),
-            0.0,
-            1.0,
-            // bottom right
-            (window.x as f32
-                + window.width as f32
-                + window.border_width as f32 * 2.0),
-            (window.y as f32
-                + window.height as f32
-                + window.border_width as f32 * 2.0),
-            1.0,
-            1.0,
-        ]);
-
-        window.context.texture.bind();
-        unsafe {
-            gl::DrawElements(
-                gl::TRIANGLES,
-                6,
-                gl::UNSIGNED_INT,
-                std::ptr::null(),
-            );
-            setup::check_gl_error();
-        }
+    pub fn init_window(&self, win: &mut Window) {
+        // No point in creating texture or glxpixmap since they have
+        // to be re created for every update
+        win.context.vbo = Buffer::new();
+        win.context.load_buffer(win);
     }
 
-    pub fn update_glxpixmap(&self, win: &mut Window) {
-        // The texture is only updated on `update_window_texture`
+    pub fn update_pixmap(&self, win: &mut Window) {
+        // The texture is only updated on `update_texture`
         // so no need to bind yet
         win.context.texture = Texture::new();
         win.update_pixmap(self.conn).unwrap();
@@ -221,7 +183,11 @@ impl<'a> Opengl<'a> {
         };
     }
 
-    pub fn update_window_texture(&self, win: &mut Window) {
+    pub fn update_pos(&self, win: &Window) {
+        win.context.update_buffer(win);
+    }
+
+    pub fn update_texture(&self, win: &mut Window) {
         win.context.texture.bind();
         unsafe {
             (self.glx_bind_tex_image)(
@@ -246,9 +212,27 @@ impl<'a> Opengl<'a> {
         }
     }
 
+    pub fn draw_window(&self, window: &Window) {
+        window.context.vbo.bind();
+        // TODO: OpenGl 4.3 has glBindVertexBuffers
+        VertexArray::attrib_pointer(0, 2, 4, 0);
+        VertexArray::attrib_pointer(1, 2, 4, 2);
+        window.context.texture.bind();
+        unsafe {
+            gl::DrawElements(
+                gl::TRIANGLES,
+                6,
+                gl::UNSIGNED_INT,
+                std::ptr::null(),
+            );
+            // TODO: check for performance impact of this line
+            //setup::check_gl_error();
+        }
+    }
+
     pub fn render(&self) {
         unsafe {
-            glXSwapBuffers(self.dpy, self.draw_win);
+            glXSwapBuffers(self.dpy, self.target_win);
             gl::Clear(gl::COLOR_BUFFER_BIT);
             //gl::ClearColor(0.4, 0.4, 0.5, 1.0);
         }
@@ -267,4 +251,50 @@ pub struct BackendContext {
     pub glxpixmap: c_ulong,
     pub texture: Texture,
     pub vbo: Buffer,
+}
+
+impl BackendContext {
+    pub fn load_buffer(&self, window: &Window) {
+        // TODO: Look into geometry shader
+        self.vbo.bind();
+        self.vbo.load_data(&formatted_win_data(window));
+    }
+    pub fn update_buffer(&self, window: &Window) {
+        // TODO: Look into geometry shader
+        self.vbo.bind();
+        self.vbo.update_data(&formatted_win_data(window));
+    }
+}
+
+fn formatted_win_data(window: &Window) -> [f32; 16] {
+    [
+        // top left
+        (window.x as f32),
+        (window.y as f32),
+        0.0,
+        0.0,
+        // top right
+        (window.x as f32
+            + window.width as f32
+            + window.border_width as f32 * 2.0),
+        (window.y as f32),
+        1.0,
+        0.0,
+        // bottom left
+        (window.x as f32),
+        (window.y as f32
+            + window.height as f32
+            + window.border_width as f32 * 2.0),
+        0.0,
+        1.0,
+        // bottom right
+        (window.x as f32
+            + window.width as f32
+            + window.border_width as f32 * 2.0),
+        (window.y as f32
+            + window.height as f32
+            + window.border_width as f32 * 2.0),
+        1.0,
+        1.0,
+    ]
 }

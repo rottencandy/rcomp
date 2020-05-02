@@ -25,6 +25,17 @@ impl Buffer {
             );
         }
     }
+    pub fn update_data<T>(&self, data: &[T]) {
+        unsafe {
+            gl::BufferSubData(
+                gl::ARRAY_BUFFER,
+                0,
+                (data.len() * std::mem::size_of::<T>())
+                    as gl::types::GLsizeiptr,
+                data.as_ptr() as *const gl::types::GLvoid,
+            );
+        }
+    }
     pub fn unbind() {
         unsafe { gl::BindBuffer(gl::ARRAY_BUFFER, 0) }
     }
