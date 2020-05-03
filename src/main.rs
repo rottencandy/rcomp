@@ -7,7 +7,6 @@ mod state;
 mod window;
 
 use backend::opengl;
-use backend::opengl::buffer::Buffer;
 use state::State;
 use std::process;
 use window::Window;
@@ -15,7 +14,8 @@ use window::Window;
 use std::time::{Duration, Instant};
 
 fn main() {
-    let state = State::init().unwrap();
+    let mut state = State::init().unwrap();
+    state.update_root_pixmap();
 
     let mut windows = Window::fetch_windows(&state.conn);
     init::window::request_events(&state.conn);

@@ -29,6 +29,8 @@ pub struct Opengl<'a> {
     pub dpy: *mut xlib::Display,
     pub target_win: xlib::XID,
     pub fbconfig: GLXFBConfig,
+    pub root_data_vbo: Buffer,
+    pub root_texture: Texture,
 
     // I don't yet know enough Rust to do this any other way
     glx_bind_tex_image: setup::GLXBindTexImageEXT,
@@ -129,12 +131,53 @@ impl<'a> Opengl<'a> {
         ebo.bind();
         ebo.load_data(&[0, 1, 2, 1, 2, 3]);
 
+        // create root texture from pixmap
+        let root_texture = {
+            let root_glxpixmap = unsafe {
+                setup::glXCreatePixmap(
+                    raw_dpy,
+                    fbconfig,
+                    state.root.pixmap as u64,
+                    [
+                        GLX_TEXTURE_TARGET_EXT,
+                        GLX_TEXTURE_2D_EXT,
+                        GLX_TEXTURE_FORMAT_EXT,
+                        GLX_TEXTURE_FORMAT_RGBA_EXT,
+                        xcb::NONE as i32,
+                    ]
+                    .as_ptr(),
+                )
+            };
+            let texture = Texture::new();
+            texture.bind();
+            unsafe {
+                (glx_bind_tex_image)(
+                    raw_dpy,
+                    root_glxpixmap,
+                    GLX_FRONT_LEFT_EXT,
+                    std::ptr::null(),
+                );
+            }
+            set_tex_params();
+            texture
+        };
+
+        // Root dimensions data
+        let root_data_vbo = {
+            let vbo = Buffer::new();
+            vbo.bind();
+            vbo.load_data(&formatted_win_data(&state.root));
+            vbo
+        };
+
         Ok(Opengl {
             ctx,
             conn: &state.conn,
             dpy: raw_dpy,
             target_win: state.overlay as xlib::XID,
             fbconfig,
+            root_texture,
+            root_data_vbo,
             glx_bind_tex_image,
             glx_release_tex_image,
 
@@ -198,18 +241,7 @@ impl<'a> Opengl<'a> {
             );
         }
         // Set texture parameters
-        unsafe {
-            gl::TexParameteri(
-                gl::TEXTURE_2D,
-                gl::TEXTURE_MIN_FILTER,
-                gl::NEAREST as i32,
-            );
-            gl::TexParameteri(
-                gl::TEXTURE_2D,
-                gl::TEXTURE_MAG_FILTER,
-                gl::NEAREST as i32,
-            );
-        }
+        set_tex_params();
     }
 
     pub fn draw_window(&self, window: &Window) {
@@ -234,7 +266,21 @@ impl<'a> Opengl<'a> {
         unsafe {
             glXSwapBuffers(self.dpy, self.target_win);
             gl::Clear(gl::COLOR_BUFFER_BIT);
-            //gl::ClearColor(0.4, 0.4, 0.5, 1.0);
+            // draw root window
+            self.root_data_vbo.bind();
+            VertexArray::attrib_pointer(0, 2, 4, 0);
+            VertexArray::attrib_pointer(1, 2, 4, 2);
+            self.root_texture.bind();
+            unsafe {
+                gl::DrawElements(
+                    gl::TRIANGLES,
+                    6,
+                    gl::UNSIGNED_INT,
+                    std::ptr::null(),
+                );
+                // TODO: check for performance impact of this line
+                //setup::check_gl_error();
+            }
         }
     }
 }
@@ -263,6 +309,21 @@ impl BackendContext {
         // TODO: Look into geometry shader
         self.vbo.bind();
         self.vbo.update_data(&formatted_win_data(window));
+    }
+}
+
+fn set_tex_params() {
+    unsafe {
+        gl::TexParameteri(
+            gl::TEXTURE_2D,
+            gl::TEXTURE_MIN_FILTER,
+            gl::NEAREST as i32,
+        );
+        gl::TexParameteri(
+            gl::TEXTURE_2D,
+            gl::TEXTURE_MAG_FILTER,
+            gl::NEAREST as i32,
+        );
     }
 }
 

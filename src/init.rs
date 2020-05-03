@@ -1,5 +1,5 @@
 pub mod window {
-    use std::process;
+    use std::process::exit;
 
     /// Creates a dummy window, used to get ownership of atoms,
     /// returns the window ID.
@@ -26,12 +26,12 @@ pub mod window {
         );
         // No need to map the window, since we don't need to display anything
         conn.flush();
-        grab_atoms(conn, win, screen_num);
+        grab_cm_atoms(conn, win, screen_num);
         win
     }
 
     /// Try and get the ownership of _NET_WM_CM_Sn atoms, one for each screen.
-    fn grab_atoms(conn: &xcb::Connection, win: xcb::Window, screens: u8) {
+    fn grab_cm_atoms(conn: &xcb::Connection, win: xcb::Window, screens: u8) {
         for screen in 0..screens {
             let atom = xcb::intern_atom(
                 conn,
@@ -49,7 +49,7 @@ pub mod window {
                 != xcb::ATOM_NONE
             {
                 eprintln!("Another compositor is already running");
-                process::exit(1);
+                exit(1);
             }
 
             xcb::set_selection_owner(conn, win, atom, xcb::CURRENT_TIME);
@@ -62,7 +62,7 @@ pub mod window {
                 != win
             {
                 eprintln!("Unable to get _NET_WM_CM_Sn ownership");
-                process::exit(1);
+                exit(1);
             }
         }
     }

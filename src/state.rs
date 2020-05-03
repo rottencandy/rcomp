@@ -1,4 +1,4 @@
-use std::process;
+use std::process::exit;
 
 use crate::init;
 use crate::Window;
@@ -36,17 +36,68 @@ impl State {
 
         init::extensions::verify(&conn).unwrap_or_else(|err| {
             eprintln!("Error: extension `{}` not found.", err);
-            process::exit(1);
+            exit(1);
         });
 
         let overlay = init::extensions::redirect_subwindows(&conn)
             .unwrap_or_else(|err| {
                 eprintln!("Failed redirecting subwindows: {}", err);
-                process::exit(1);
+                exit(1);
             });
 
         let win_id = init::window::create_window(&conn);
 
         Ok(State { conn, xlib_screens, xcb_screens, root, overlay, win_id })
     }
+    pub fn update_root_pixmap(&mut self) {
+        self.root.pixmap = match get_root_pixmap(&self.conn, &self.root) {
+            Ok(pixmap) => pixmap,
+            // TODO: create new 1x1 pixmap
+            Err(message) => {
+                eprintln!("{}", message);
+                xcb::NONE
+            }
+        };
+    }
+}
+
+fn get_root_pixmap(
+    conn: &xcb::Connection,
+    root: &Window,
+) -> Result<xcb::Pixmap, &'static str> {
+    let root_atoms = [
+        xcb::intern_atom(conn, false, &"ESETROOT_PMAP_ID")
+            .get_reply()
+            .unwrap()
+            .atom(),
+        xcb::intern_atom(conn, false, &"_XROOTPMAP_ID")
+            .get_reply()
+            .unwrap()
+            .atom(),
+        xcb::intern_atom(conn, false, &"_XSETROOT_ID")
+            .get_reply()
+            .unwrap()
+            .atom(),
+    ];
+    for atom in root_atoms.iter() {
+        if let Ok(result) = xcb::get_property(
+            conn,
+            false,
+            root.id,
+            *atom,
+            xcb::ATOM_PIXMAP,
+            0,
+            4,
+        )
+        .get_reply()
+        {
+            if result.type_() == xcb::ATOM_PIXMAP
+                && result.format() == 32
+                && result.value_len() == 1
+            {
+                return Ok(result.value::<u32>()[0] as xcb::Pixmap);
+            }
+        }
+    }
+    Err("unable to get root pixmap")
 }
