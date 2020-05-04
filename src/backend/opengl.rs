@@ -36,7 +36,6 @@ pub struct Opengl<'a> {
     glx_bind_tex_image: setup::GLXBindTexImageEXT,
     glx_release_tex_image: setup::GLXReleaseTexImageEXT,
 
-    vbo: Buffer,
     _vao: VertexArray,
     _ebo: ElementBuffer,
 }
@@ -117,14 +116,10 @@ impl<'a> Opengl<'a> {
         // Vertex object and array
         let vao = VertexArray::new();
         vao.bind();
-        let vbo = Buffer::new();
-        vbo.bind();
         // for pos co-ordinates
         VertexArray::enable(0);
-        VertexArray::attrib_pointer(0, 2, 4, 0);
         // for texture co-ordinates
         VertexArray::enable(1);
-        VertexArray::attrib_pointer(1, 2, 4, 2);
 
         // Element buffer array
         let ebo = ElementBuffer::new();
@@ -183,7 +178,6 @@ impl<'a> Opengl<'a> {
 
             // Even if we don't directly use these, they have to
             // remain in scope so their context doesn't get deleted
-            vbo: vbo,
             _vao: vao,
             _ebo: ebo,
         })
@@ -271,16 +265,14 @@ impl<'a> Opengl<'a> {
             VertexArray::attrib_pointer(0, 2, 4, 0);
             VertexArray::attrib_pointer(1, 2, 4, 2);
             self.root_texture.bind();
-            unsafe {
-                gl::DrawElements(
-                    gl::TRIANGLES,
-                    6,
-                    gl::UNSIGNED_INT,
-                    std::ptr::null(),
-                );
-                // TODO: check for performance impact of this line
-                //setup::check_gl_error();
-            }
+            gl::DrawElements(
+                gl::TRIANGLES,
+                6,
+                gl::UNSIGNED_INT,
+                std::ptr::null(),
+            );
+            // TODO: check for performance impact of this line
+            //setup::check_gl_error();
         }
     }
 }

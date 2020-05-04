@@ -98,7 +98,7 @@ pub fn glx_dec_version(dpy: *mut xlib::Display) -> Result<i32, &'static str> {
 
 /// Checks if a given glx extension exists in extension query string
 pub fn check_glx_extension(glx_exts: &str, ext_name: &str) -> bool {
-    for glx_ext in glx_exts.split(" ") {
+    for glx_ext in glx_exts.split(' ') {
         if glx_ext == ext_name {
             return true;
         }

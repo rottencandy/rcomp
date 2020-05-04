@@ -23,7 +23,7 @@ impl Window {
         let tree = xcb::query_tree(conn, screen.root()).get_reply().unwrap();
         let mut windows: Vec<Window> =
             Vec::with_capacity(tree.children_len() as usize);
-        for win in tree.children() {
+        for win in tree.children().iter().rev() {
             match Window::new(conn, *win) {
                 Ok(w) => windows.push(w),
                 Err(_) => println!("Unable to get info for win: {}", win),

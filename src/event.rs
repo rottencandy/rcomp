@@ -52,7 +52,6 @@ pub fn handle_event(
             backend.render();
         }
         // Window property(size, border, position, stack order) changed
-        // TODO: restack
         // TODO: check if window is root
         xcb::CONFIGURE_NOTIFY => {
             println!("CONFIGURE_NOTIFY");
@@ -72,6 +71,7 @@ pub fn handle_event(
                 }
                 w.update_using_event(ev);
                 backend.update_pos(w);
+                restack_window(win_id, ev.above_sibling(), windows);
             } else if win_id == state.root.id {
                 //backend.update_pixmap(win_id);
                 //backend.update_texture(win_id);
@@ -122,7 +122,7 @@ pub fn handle_event(
                 unsafe { xcb::cast_event(&base_event) };
             let win_id = event.window();
             if event.parent() == state.root.id {
-                if let None = windows.iter().position(|w| w.id == win_id) {
+                if windows.iter().position(|w| w.id == win_id).is_none() {
                     match Window::new(&state.conn, win_id) {
                         Ok(mut win) => {
                             if win.mapped {
@@ -147,19 +147,16 @@ pub fn handle_event(
             println!("CIRCULATE_NOTIFY");
             let ev: &xcb::CirculateNotifyEvent =
                 unsafe { xcb::cast_event(&base_event) };
-            if let Some(i) = windows.iter().position(|w| w.id == ev.window()) {
-                let win = windows.remove(i);
-                // Window is placed below all its siblings
-                if ev.place() == xcb::PLACE_ON_BOTTOM as u8 {
-                    windows.push(win);
-                } else {
-                    windows.insert(0, win);
-                }
-                for win in windows.iter_mut().filter(|w| w.mapped) {
-                    backend.draw_window(win);
-                }
-                backend.render();
+            let win_above = if ev.place() == xcb::PLACE_ON_TOP as u8 {
+                windows[0].id
+            } else {
+                xcb::NONE
+            };
+            restack_window(ev.window(), win_above, windows);
+            for win in windows.iter_mut().filter(|w| w.mapped) {
+                backend.draw_window(win);
             }
+            backend.render();
         }
         // Window unhidden
         xcb::EXPOSE => {
@@ -213,6 +210,27 @@ pub fn handle_event(
                     *last_render = Instant::now();
                 }
             }
+        }
+    }
+}
+
+fn restack_window(
+    window: xcb::Window,
+    above: xcb::Window,
+    list: &mut Vec<Window>,
+) {
+    if let Some(i) = list.iter().position(|w| w.id == window) {
+        let win = list.remove(i);
+
+        if above != xcb::NONE {
+            if let Some(pos) = list.iter().position(|w| w.id == above) {
+                list.insert(pos + 1, win);
+            } else {
+                println!("Invalid above window: {}", above);
+                list.push(win);
+            }
+        } else {
+            list.push(win);
         }
     }
 }
