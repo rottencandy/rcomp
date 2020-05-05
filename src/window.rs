@@ -1,5 +1,5 @@
 use crate::opengl::BackendContext;
-use xcb::{composite, damage, shape};
+use xcb::{composite, damage, render, shape};
 
 pub struct Window {
     pub id: xcb::Window,
@@ -10,6 +10,7 @@ pub struct Window {
     pub border_width: u16,
     pub mapped: bool,
     pub override_redirect: bool,
+    pub alpha: bool,
     pub pixmap: xcb::Pixmap,
     pub context: BackendContext,
     pub damage: damage::Damage,
@@ -39,6 +40,7 @@ impl Window {
     ) -> Result<Window, xcb::GenericError> {
         let geometry = xcb::get_geometry(conn, win).get_reply()?;
         let attrs = xcb::get_window_attributes(conn, win).get_reply()?;
+
         Ok(Window {
             id: win,
             x: geometry.x(),
@@ -48,6 +50,7 @@ impl Window {
             height: geometry.height(),
             mapped: attrs.map_state() == xcb::MAP_STATE_VIEWABLE as u8,
             override_redirect: attrs.override_redirect(),
+            alpha: has_alpha(conn, attrs.colormap()),
             pixmap: conn.generate_id(),
             context: Default::default(),
             damage: 0,
@@ -101,4 +104,17 @@ impl Window {
         shape::select_input(conn, self.id, true).request_check()?;
         Ok(())
     }
+}
+
+// TODO: cacke pict_format iterator
+fn has_alpha(conn: &xcb::Connection, colormap: xcb::Colormap) -> bool {
+    for format in
+        render::query_pict_formats(conn).get_reply().unwrap().formats()
+    {
+        if format.colormap() == colormap {
+            return format.type_() == render::PICT_TYPE_DIRECT as u8
+                && format.direct().alpha_mask() != 0;
+        }
+    }
+    false
 }
